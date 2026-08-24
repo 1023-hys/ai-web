@@ -325,6 +325,111 @@
     color: #fff;
   }
 
+  /* ========== 附件预览（统一比例） ========== */
+  .attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 6px;
+    max-width: 360px;
+  }
+
+  /* 单个附件卡：4:3 固定比例容器 */
+  .attachment-image,
+  .attachment-video {
+    width: 200px;
+    height: 150px;            /* 4:3 */
+    object-fit: cover;        /* 关键：裁剪填满，不保留原比例 */
+    border-radius: 10px;
+    background: #000;
+    display: block;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  .attachment-audio {
+    width: 240px;
+    height: 36px;
+    outline: none;
+  }
+
+  .attachment-link {
+    font-size: 12px;
+    color: #2AABEE;
+    word-break: break-all;
+    background: rgba(42, 171, 238, 0.08);
+    padding: 6px 8px;
+    border-radius: 6px;
+    max-width: 100%;
+  }
+
+  /* 输入栏上方的待发送附件预览条 */
+  .attach-preview-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 6px 12px 0;
+    max-height: 90px;
+    overflow-y: auto;
+  }
+  .attach-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #eaf5fc;
+    color: #229ED9;
+    border-radius: 14px;
+    padding: 4px 6px 4px 10px;
+    font-size: 12px;
+    max-width: 240px;
+  }
+  .attach-chip img {
+    width: 22px; height: 22px;
+    object-fit: cover;
+    border-radius: 4px;
+  }
+  .attach-chip button {
+    width: 18px; height: 18px;
+    border: none;
+    background: transparent;
+    color: #9099a1;
+    cursor: pointer;
+    border-radius: 50%;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0;
+  }
+  .attach-chip button:hover { background: #fff; color: #e74c3c; }
+
+  .audio-recording-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #fff5f5;
+    color: #c0392b;
+    border-top: 1px solid #f3d3d3;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .audio-recording-bar .rec-dot {
+    width: 10px; height: 10px;
+    background: #e74c3c;
+    border-radius: 50%;
+    animation: pulse 1s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+  .audio-recording-bar button {
+    margin-left: auto;
+    height: 28px; padding: 0 14px;
+    border: none; border-radius: 14px;
+    background: #e74c3c; color: #fff;
+    font-size: 12px; cursor: pointer;
+    font-weight: 600;
+  }
+
   .typing {
     align-self: flex-start;
     background: #fff;

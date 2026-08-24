@@ -267,6 +267,13 @@
     user-select: none;
   }
 
+  .msg.user .delete-icon {
+    right: 28px;
+    color: #e74c3c;
+  }
+
+  .msg.user .delete-icon:hover { border-color: #e74c3c !important; color: #e74c3c !important; }
+
   .msg.user:hover .retry-icon { opacity: 0.65; }
   .msg.user .retry-icon:hover { opacity: 1; color: #2AABEE; border-color: #2AABEE; }
 
@@ -804,7 +811,25 @@
       <div class="msg system">已连接，开始与 AI 对话吧 👋</div>
     </div>
 
+    <div class="attach-preview-bar" id="attachPreviewBar" style="display:none"></div>
+    <div class="audio-recording-bar" id="audioRecordingBar" style="display:none">
+      <span class="rec-dot"></span>
+      <span id="audioRecordingTime">0:00</span>
+      <span>正在录音...</span>
+      <button id="audioStopBtn">停止并发送</button>
+    </div>
+
     <div class="input-bar">
+      <button class="attach-btn" id="imageBtn" title="上传图片">
+        <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+      </button>
+      <input type="file" id="imageFile" accept="image/*" style="display:none">
+
+      <button class="attach-btn" id="audioBtn" title="语音（上传/录音）">
+        <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 003-3V5a3 3 0 10-6 0v6a3 3 0 003 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
+      </button>
+      <input type="file" id="audioFile" accept="audio/*,video/*" style="display:none">
+
       <button class="attach-btn" id="videoBtn" title="视频解析">
         <svg viewBox="0 0 24 24"><path d="M17 10.5V7a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1v-3.5l4 4v-11l-4 4z"/></svg>
       </button>
@@ -878,6 +903,39 @@
         <div class="hint">每次重试前的等待秒数，逐次递增（上限 15s）</div>
       </div>
 
+      <div class="mm-group">
+        <div class="mm-title">📷 多模态能力</div>
+        <div class="mm-row">
+          <label class="mm-label">
+            <input type="checkbox" id="mmVisionSupport"> 模型支持图片分析（直接发送图片）
+          </label>
+        </div>
+        <div class="mm-row">
+          <input type="text" class="tool-endpoint" id="mmOcrEndpoint" placeholder="OCR 工具端点（未勾选时使用，POST 返回 {text}）">
+        </div>
+        <div class="mm-hint">不勾选时，图片走 OCR 工具（如 http://localhost:8000/ocr，请求体 form-data: image=文件），把识别文本喂给 AI</div>
+
+        <div class="mm-row">
+          <label class="mm-label">
+            <input type="checkbox" id="mmAudioSupport"> 模型支持音频解析（直接发送音频）
+          </label>
+        </div>
+        <div class="mm-row">
+          <input type="text" class="tool-endpoint" id="mmAsrEndpoint" placeholder="ASR 工具端点（未勾选时使用，POST 返回 {text}）">
+        </div>
+        <div class="mm-hint">不勾选时，语音走 ASR 工具转文本。支持上传或浏览器直接录音</div>
+
+        <div class="mm-row">
+          <label class="mm-label">
+            <input type="checkbox" id="mmVideoSupport"> 模型支持视频解析（直接发送视频链接/文件）
+          </label>
+        </div>
+        <div class="mm-row">
+          <input type="text" class="tool-endpoint" id="mmVideoToolEndpoint" placeholder="视频分析工具端点（未勾选时使用）">
+        </div>
+        <div class="mm-hint">不勾选时，走抽帧/OCR 工具（POST form-data 含 video/url+prompt，返回 {frames:[{image,text}], summary}）</div>
+      </div>
+
       <button class="start-btn" id="startBtn">保存并返回</button>
       <button class="secondary-btn" id="clearChatBtn" type="button">清空当前对话</button>
       <button class="danger-btn" id="deleteChatBtn" type="button">删除当前对话</button>
@@ -895,14 +953,18 @@
     </div>
     <div class="modal-body">
       <div class="modal-form-group">
-        <label for="videoUrl">视频链接</label>
+        <label for="videoUrl">视频链接（留空可上传本地视频）</label>
         <input type="text" id="videoUrl" placeholder="https://..." autocomplete="off">
+      </div>
+      <div class="modal-form-group">
+        <label>或上传本地视频文件</label>
+        <input type="file" id="videoFileInput" accept="video/*">
       </div>
       <div class="modal-form-group">
         <label for="videoPrompt">提示词</label>
         <textarea id="videoPrompt" placeholder="告诉 AI 你想从视频中了解什么..."></textarea>
       </div>
-      <div class="modal-hint">将视频链接与提示词组合后发送给 AI 进行解析</div>
+      <div class="modal-hint">支持链接或本地视频；模型支持视频则直接发送，否则走抽帧/OCR 工具</div>
     </div>
     <div class="modal-footer">
       <button class="modal-btn cancel" id="videoCancelBtn">取消</button>
@@ -941,6 +1003,10 @@
   const sendBtn = document.getElementById('sendBtn');
   const resetBtn = document.getElementById('resetBtn');
   const videoBtn = document.getElementById('videoBtn');
+  const imageBtn = document.getElementById('imageBtn');
+  const imageFile = document.getElementById('imageFile');
+  const audioBtn = document.getElementById('audioBtn');
+  const audioFile = document.getElementById('audioFile');
 
   const configPage = document.getElementById('configPage');
   const convNameInput = document.getElementById('convName');
@@ -953,6 +1019,12 @@
   const contextLimitInput = document.getElementById('contextLimit');
   const retryCountInput = document.getElementById('retryCount');
   const retryIntervalInput = document.getElementById('retryInterval');
+  const mmVisionSupportEl = document.getElementById('mmVisionSupport');
+  const mmOcrEndpointEl = document.getElementById('mmOcrEndpoint');
+  const mmAudioSupportEl = document.getElementById('mmAudioSupport');
+  const mmAsrEndpointEl = document.getElementById('mmAsrEndpoint');
+  const mmVideoSupportEl = document.getElementById('mmVideoSupport');
+  const mmVideoToolEndpointEl = document.getElementById('mmVideoToolEndpoint');
   const startBtn = document.getElementById('startBtn');
   const clearChatBtn = document.getElementById('clearChatBtn');
   const deleteChatBtn = document.getElementById('deleteChatBtn');
@@ -971,12 +1043,23 @@
   const switchContinue = document.getElementById('switchContinue');
   const switchAbort = document.getElementById('switchAbort');
 
+  const attachPreviewBar = document.getElementById('attachPreviewBar');
+  const audioRecordingBar = document.getElementById('audioRecordingBar');
+  const audioRecordingTime = document.getElementById('audioRecordingTime');
+  const audioStopBtn = document.getElementById('audioStopBtn');
+
   /* ========== 全局状态 ========== */
   let conversations = [];
   let currentId = null;
   let isLoading = false;
   let currentAbortController = null;
   let retryStatusEl = null;
+  // 待发送附件队列（图片/音频/视频/链接）
+  let pendingAttachments = [];
+  // 语音录音状态
+  let mediaRecorder = null;
+  let recordingChunks = [];
+  let recordingStream = null;
 
   const STORAGE_KEY = 'ai_chat_conversations_v1';
   const MAX_BACKOFF_MS = 15000;
@@ -997,7 +1080,14 @@
       maxTokens: 0,
       contextLimit: 0,
       retryCount: 10,
-      retryInterval: 2
+      retryInterval: 2,
+      // 多模态能力
+      visionSupport: false,
+      ocrEndpoint: '',
+      audioSupport: false,
+      asrEndpoint: '',
+      videoSupport: false,
+      videoToolEndpoint: ''
     };
     if (prev) {
       base.endpoint = prev.endpoint || '';
@@ -1008,6 +1098,12 @@
       base.contextLimit = prev.contextLimit ?? 0;
       base.retryCount = prev.retryCount ?? 10;
       base.retryInterval = prev.retryInterval ?? 2;
+      base.visionSupport = !!prev.visionSupport;
+      base.ocrEndpoint = prev.ocrEndpoint || '';
+      base.audioSupport = !!prev.audioSupport;
+      base.asrEndpoint = prev.asrEndpoint || '';
+      base.videoSupport = !!prev.videoSupport;
+      base.videoToolEndpoint = prev.videoToolEndpoint || '';
     }
     return base;
   }
@@ -1046,6 +1142,8 @@
         c.config.activeModel = c.config.models[0];
       }
       if (!Array.isArray(c.messages)) c.messages = [];
+      // 数据兼容：确保纯文本消息 content 为字符串；保留 attachments
+      c.messages.forEach(m => { if (typeof m.content !== 'string') m.content = String(m.content || ''); });
     });
     if (conversations.length === 0) {
       const c = { id: uid(), name: '新对话', config: defaultConfig(), messages: [] };
@@ -1173,7 +1271,7 @@
       return;
     }
     conv.messages.forEach((m, idx) => {
-      const el = appendMsg(m.role === 'assistant' ? 'ai' : m.role, m.content, false);
+      const el = appendMsg(m.role === 'assistant' ? 'ai' : m.role, m.content, false, m.attachments);
       if (m.role === 'user' && el) {
         el.dataset.idx = idx;
         addRetryIcon(el, idx);
@@ -1260,6 +1358,12 @@
     contextLimitInput.value = conv.config.contextLimit ?? 0;
     retryCountInput.value = conv.config.retryCount ?? 10;
     retryIntervalInput.value = conv.config.retryInterval ?? 2;
+    mmVisionSupportEl.checked = !!conv.config.visionSupport;
+    mmOcrEndpointEl.value = conv.config.ocrEndpoint || '';
+    mmAudioSupportEl.checked = !!conv.config.audioSupport;
+    mmAsrEndpointEl.value = conv.config.asrEndpoint || '';
+    mmVideoSupportEl.checked = !!conv.config.videoSupport;
+    mmVideoToolEndpointEl.value = conv.config.videoToolEndpoint || '';
     configError.textContent = '';
     configPage.classList.remove('hidden');
     setTimeout(() => convNameInput.focus(), 100);
@@ -1318,6 +1422,12 @@
     conv.config.contextLimit = contextLimit;
     conv.config.retryCount = retryCount;
     conv.config.retryInterval = retryInterval;
+    conv.config.visionSupport = !!mmVisionSupportEl.checked;
+    conv.config.ocrEndpoint = mmOcrEndpointEl.value.trim();
+    conv.config.audioSupport = !!mmAudioSupportEl.checked;
+    conv.config.asrEndpoint = mmAsrEndpointEl.value.trim();
+    conv.config.videoSupport = !!mmVideoSupportEl.checked;
+    conv.config.videoToolEndpoint = mmVideoToolEndpointEl.value.trim();
 
     saveConversations();
     renderConversationList();
@@ -1330,9 +1440,7 @@
   msgInput.addEventListener('input', () => {
     msgInput.style.height = 'auto';
     msgInput.style.height = Math.min(msgInput.scrollHeight, 120) + 'px';
-    if (!sendBtn.classList.contains('stop-mode')) {
-      sendBtn.disabled = msgInput.value.trim().length === 0 || isLoading;
-    }
+    updateSendBtnState();
   });
 
   msgInput.addEventListener('keydown', e => {
@@ -1350,11 +1458,15 @@
     if (!sendBtn.disabled) sendMessage();
   });
 
-  function sendMessage(externalText) {
+  function sendMessage(externalText, extAttachments) {
     const conv = getConv();
     if (!conv) return;
-    const text = (externalText !== undefined ? externalText : msgInput.value).trim();
-    if (!text || isLoading) return;
+    const hasExternal = externalText !== undefined || (extAttachments && extAttachments.length);
+    const text = hasExternal ? (externalText || '').trim() : msgInput.value.trim();
+    // 附件：外部传入或本地待发送队列
+    const attachmentsIn = (extAttachments && extAttachments.length) ? extAttachments.slice() : pendingAttachments.slice();
+    if (!text && attachmentsIn.length === 0) return;
+    if (isLoading) return;
 
     // 清理上一次失败/中断的痕迹
     removeLastFailure();
@@ -1370,17 +1482,22 @@
       return;
     }
 
-    conv.messages.push({ role: 'user', content: text });
+    const userMsg = { role: 'user', content: text };
+    if (attachmentsIn.length) userMsg.attachments = attachmentsIn.map(a => Object.assign({}, a));
+    conv.messages.push(userMsg);
     saveConversations();
-    const userEl = appendMsg('user', text);
+
+    const userEl = appendMsg('user', text, true, userMsg.attachments);
     if (userEl) {
       userEl.dataset.idx = conv.messages.length - 1;
       addRetryIcon(userEl, conv.messages.length - 1);
     }
 
-    if (externalText === undefined) {
+    if (!hasExternal) {
       msgInput.value = '';
       msgInput.style.height = 'auto';
+      pendingAttachments = [];
+      renderPendingAttachments();
     }
     sendBtn.disabled = true;
 
@@ -1388,14 +1505,20 @@
     isLoading = true;
     setSendBtnMode('stop');
 
-    callAI(conv)
-      .then(reply => {
+    // 预处理附件（OCR/ASR/视频工具）——使用同一个 abort controller 以便中断
+    const controller = new AbortController();
+    currentAbortController = controller;
+
+    (async () => {
+      try {
+        await processAttachments(userMsg.attachments || [], conv.config, controller.signal);
+        saveConversations();
+        const reply = await callAI(conv, undefined, controller);
         typingEl.remove();
         appendMsg('ai', reply);
         conv.messages.push({ role: 'assistant', content: reply });
         saveConversations();
-      })
-      .catch(err => {
+      } catch (err) {
         typingEl.remove();
         if (err && err.name === 'AbortError') {
           appendMsg('system failure', '已中断');
@@ -1403,24 +1526,44 @@
           appendMsg('error failure', '请求失败：' + err.message);
           console.error('[AI Chat] 请求失败:', err);
         }
-      })
-      .finally(() => {
+      } finally {
         clearRetryStatus();
         isLoading = false;
         currentAbortController = null;
         setSendBtnMode('send');
         msgInput.focus();
-      });
+      }
+    })();
   }
 
   // 为 user 消息附加重试图标
   function addRetryIcon(div, idx) {
+    const del = document.createElement('span');
+    del.className = 'retry-icon delete-icon';
+    del.textContent = '🗑';
+    del.title = '删除这段消息（该用户消息 + 其对应 AI 回复）';
+    del.onclick = (e) => { e.stopPropagation(); deleteMessage(idx); };
+    div.appendChild(del);
+
     const icon = document.createElement('span');
     icon.className = 'retry-icon';
     icon.textContent = '🔄';
     icon.title = '从此处重新生成（后续消息将被清除）';
     icon.onclick = (e) => { e.stopPropagation(); retryMessage(idx); };
     div.appendChild(icon);
+  }
+
+  // 删除 user @ idx 及其紧邻 assistant（若存在），后续保留
+  function deleteMessage(idx) {
+    const conv = getConv();
+    if (!conv || isLoading) return;
+    if (idx < 0 || idx >= conv.messages.length) return;
+    if (conv.messages[idx].role !== 'user') return;
+    const removeIdx = [idx];
+    if (idx + 1 < conv.messages.length && conv.messages[idx + 1].role === 'assistant') removeIdx.push(idx + 1);
+    conv.messages = conv.messages.filter((_, i) => !removeIdx.includes(i));
+    saveConversations();
+    renderMessages();
   }
 
   function removeLastFailure() {
@@ -1453,18 +1596,21 @@
     const typingEl = showTyping();
     isLoading = true;
     setSendBtnMode('stop');
-    callAI(conv, context)
-      .then(reply => {
+    const controller = new AbortController();
+    currentAbortController = controller;
+    // 重试时也要重新处理附件（OCR/ASR/视频工具，结果写入 context 的 userMsg）
+    const retryUser = context[context.length - 1];
+    (async () => {
+      try {
+        await processAttachments(retryUser.attachments || [], conv.config, controller.signal);
+        const reply = await callAI(conv, context, controller);
         typingEl.remove();
-        // 用 0..idx + 新回复 + 后续（跳过旧回复）重组，后续对话保留
         const tail = fullMessages.slice(hadOldAi ? idx + 2 : idx + 1);
         conv.messages = context.concat([{ role: 'assistant', content: reply }], tail);
         saveConversations();
         renderMessages();
-      })
-      .catch(err => {
+      } catch (err) {
         typingEl.remove();
-        // 失败/中断：恢复完整历史并重建（后续保留），再追加错误提示
         conv.messages = fullMessages;
         saveConversations();
         renderMessages();
@@ -1474,14 +1620,200 @@
           appendMsg('error failure', '请求失败：' + err.message);
           console.error('[AI Chat] 请求失败:', err);
         }
-      })
-      .finally(() => {
+      } finally {
         clearRetryStatus();
         isLoading = false;
         currentAbortController = null;
         setSendBtnMode('send');
         msgInput.focus();
-      });
+      }
+    })();
+  }
+
+  /* ========== 多模态工具与附件 ========== */
+  // 统一把一条消息对象转为 API 需要的 content（string 或 content parts 数组）
+  function normalizeMessageContent(m, cfg) {
+    if (!m.attachments || !m.attachments.length) {
+      if (typeof m.content !== 'string') return String(m.content || '');
+      return m.content;
+    }
+    const parts = [];
+    m.attachments.forEach(a => {
+      if (a.type === 'image' && a.dataUrl) {
+        if (cfg.visionSupport) {
+          parts.push({ type: 'image_url', image_url: { url: a.dataUrl } });
+        } else if (a._ocrText !== undefined) {
+          parts.push({ type: 'text', text: `【图片OCR：${a.name || '图片'}】\n${a._ocrText}` });
+        } else {
+          parts.push({ type: 'text', text: `【图片：${a.name || '未命名图片'}（OCR未执行）】` });
+        }
+      } else if (a.type === 'audio' && a.dataUrl) {
+        if (cfg.audioSupport) {
+          parts.push({ type: 'input_audio', input_audio: { data: a.dataUrl.split(',')[1] || a.dataUrl, format: (a.ext || 'webm') } });
+        } else if (a._asrText !== undefined) {
+          parts.push({ type: 'text', text: `【语音转写：${a.name || '语音'}】\n${a._asrText}` });
+        } else {
+          parts.push({ type: 'text', text: `【语音：${a.name || '未命名语音'}（ASR未执行）】` });
+        }
+      } else if (a.type === 'video') {
+        if (cfg.videoSupport && a.dataUrl) {
+          parts.push({ type: 'input_video', input_video: { data: a.dataUrl.split(',')[1] || a.dataUrl, format: (a.ext || 'mp4') } });
+        } else if (cfg.videoSupport && a.url) {
+          parts.push({ type: 'text', text: `【视频链接：${a.url}】` });
+        } else if (a._toolSummary !== undefined) {
+          parts.push({ type: 'text', text: `【视频分析结果：${a.url || a.name || '视频'}】\n${a._toolSummary}\n${a.prompt ? '\n用户提问：' + a.prompt : ''}` });
+        } else if (a.url) {
+          parts.push({ type: 'text', text: `【视频链接：${a.url}】${a.prompt ? '\n提示词：' + a.prompt : ''}\n请基于链接解析内容。` });
+        } else {
+          parts.push({ type: 'text', text: `【视频：${a.name || '未命名视频'}（工具未处理）】` });
+        }
+      } else if (a.type === 'link' && a.url) {
+        parts.push({ type: 'text', text: `【链接：${a.label || a.url}】${a.url}` });
+      }
+    });
+    const text = m.content;
+    if (text && typeof text === 'string' && text.trim()) {
+      parts.push({ type: 'text', text: text });
+    }
+    // 兼容纯文本模型：全部降级为文本拼接
+    const hasVision = m.attachments.some(a => a.type === 'image');
+    const hasAudio = m.attachments.some(a => a.type === 'audio');
+    const hasVideo = m.attachments.some(a => a.type === 'video');
+    if ((hasVision && !cfg.visionSupport) || (hasAudio && !cfg.audioSupport) || (hasVideo && !cfg.videoSupport)) {
+      return parts.map(p => (p && p.text) || '').join('\n\n').trim() || ' ';
+    }
+    // 如果所有附件都用了 direct support，且含 image/audio/video，保持 parts
+    if (parts.some(p => p.type === 'image_url' || p.type === 'input_audio' || p.type === 'input_video')) {
+      return parts;
+    }
+    // 否则返回纯文本拼接（避免空 parts）
+    return parts.map(p => (p && p.text) || '').join('\n\n').trim() || text || ' ';
+  }
+
+  // 发送前处理附件：按开关决定是否调用工具
+  async function processAttachments(attachments, cfg, signal) {
+    if (!attachments || !attachments.length) return;
+    for (const a of attachments) {
+      if (a.type === 'image') {
+        if (cfg.visionSupport) continue;
+        // OCR 兜底
+        if (!cfg.ocrEndpoint) {
+          a._ocrText = '(未配置 OCR 工具端点，请在设置中填写)';
+          continue;
+        }
+        try {
+          const blob = await dataUrlToBlob(a.dataUrl, a.mime);
+          const fd = new FormData();
+          fd.append('image', blob, a.name || 'image');
+          const r = await fetch(cfg.ocrEndpoint, { method: 'POST', body: fd, signal });
+          const json = await r.json();
+          a._ocrText = (json && (json.text || json.result || json.content)) || '';
+        } catch (e) {
+          if (e && e.name === 'AbortError') throw e;
+          a._ocrText = `(OCR 调用失败：${e.message})`;
+        }
+      } else if (a.type === 'audio') {
+        if (cfg.audioSupport) continue;
+        if (!cfg.asrEndpoint) {
+          a._asrText = '(未配置 ASR 工具端点，请在设置中填写)';
+          continue;
+        }
+        try {
+          const blob = await dataUrlToBlob(a.dataUrl, a.mime);
+          const fd = new FormData();
+          fd.append('audio', blob, a.name || ('audio.' + (a.ext || 'webm')));
+          if (a.prompt) fd.append('prompt', a.prompt);
+          const r = await fetch(cfg.asrEndpoint, { method: 'POST', body: fd, signal });
+          const json = await r.json();
+          a._asrText = (json && (json.text || json.result || json.content || json.transcript)) || '';
+        } catch (e) {
+          if (e && e.name === 'AbortError') throw e;
+          a._asrText = `(ASR 调用失败：${e.message})`;
+        }
+      } else if (a.type === 'video') {
+        if (cfg.videoSupport) continue;
+        if (!cfg.videoToolEndpoint) {
+          a._toolSummary = a.url ? `(未配置视频分析工具，请直接让模型分析：${a.url})` : '(未配置视频分析工具端点)';
+          continue;
+        }
+        try {
+          const fd = new FormData();
+          if (a.url) fd.append('url', a.url);
+          if (a.dataUrl) fd.append('video', await dataUrlToBlob(a.dataUrl, a.mime), a.name || ('video.' + (a.ext || 'mp4')));
+          if (a.prompt) fd.append('prompt', a.prompt);
+          const r = await fetch(cfg.videoToolEndpoint, { method: 'POST', body: fd, signal });
+          const json = await r.json();
+          let summary = (json && (json.summary || json.result || json.text || json.content)) || '';
+          if (json && Array.isArray(json.frames)) {
+            const frameText = json.frames.map((f, i) => `帧${i + 1}:${f.text || ''}`).join('\n');
+            summary = summary ? summary + '\n\n抽帧OCR:\n' + frameText : '抽帧OCR:\n' + frameText;
+          }
+          a._toolSummary = summary || '(视频工具返回为空)';
+        } catch (e) {
+          if (e && e.name === 'AbortError') throw e;
+          a._toolSummary = `(视频工具调用失败：${e.message})`;
+        }
+      }
+    }
+  }
+
+  function dataUrlToBlob(dataUrl, mime) {
+    return new Promise(resolve => {
+      const comma = dataUrl.indexOf(',');
+      if (comma < 0) { resolve(new Blob([dataUrl], { type: mime || 'application/octet-stream' })); return; }
+      const header = dataUrl.slice(0, comma);
+      const m = mime || /data:(.*?);base64/.test(header) ? (header.match(/data:(.*?)(;|,)/) || [])[1] : 'application/octet-stream';
+      const body = dataUrl.slice(comma + 1);
+      const isBase64 = /;base64/.test(header);
+      if (!isBase64) { resolve(new Blob([decodeURIComponent(body)], { type: m })); return; }
+      const bin = atob(body);
+      const arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      resolve(new Blob([arr.buffer], { type: m }));
+    });
+  }
+
+  function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result);
+      fr.onerror = () => reject(fr.error);
+      fr.readAsDataURL(file);
+    });
+  }
+
+  // 待发送附件预览
+  function renderPendingAttachments() {
+    attachPreviewBar.innerHTML = '';
+    if (pendingAttachments.length === 0) { attachPreviewBar.style.display = 'none'; return; }
+    attachPreviewBar.style.display = 'flex';
+    pendingAttachments.forEach((a, idx) => {
+      const chip = document.createElement('div');
+      chip.className = 'attach-chip';
+      let label = '';
+      if (a.type === 'image') label = '🖼 ' + (a.name || '图片');
+      else if (a.type === 'audio') label = '🎤 ' + (a.name || '语音');
+      else if (a.type === 'video') label = '🎬 ' + (a.url || a.name || '视频').slice(0, 28);
+      else label = a.name || a.type;
+      if (a.type === 'image' && a.dataUrl) {
+        const img = document.createElement('img');
+        img.src = a.dataUrl;
+        chip.appendChild(img);
+      }
+      const span = document.createElement('span');
+      span.textContent = label;
+      span.style.overflow = 'hidden';
+      span.style.textOverflow = 'ellipsis';
+      span.style.whiteSpace = 'nowrap';
+      span.style.maxWidth = '160px';
+      chip.appendChild(span);
+      const btn = document.createElement('button');
+      btn.textContent = '×';
+      btn.title = '移除';
+      btn.onclick = () => { pendingAttachments.splice(idx, 1); renderPendingAttachments(); };
+      chip.appendChild(btn);
+      attachPreviewBar.appendChild(chip);
+    });
   }
 
   /* ========== AI 调用 ========== */
@@ -1491,7 +1823,8 @@
     if (cfg.contextLimit > 0 && msgs.length > cfg.contextLimit) {
       msgs = msgs.slice(-cfg.contextLimit);
     }
-    const body = { model: model, messages: msgs, stream: false };
+    const apiMsgs = msgs.map(m => ({ role: m.role, content: normalizeMessageContent(m, cfg) }));
+    const body = { model: model, messages: apiMsgs, stream: false };
     if (cfg.maxTokens > 0) body.max_tokens = cfg.maxTokens;
 
     let res;
@@ -1629,8 +1962,8 @@
     });
   }
 
-  async function callAI(conv, contextMessages) {
-    const controller = new AbortController();
+  async function callAI(conv, contextMessages, useController) {
+    const controller = useController || new AbortController();
     currentAbortController = controller;
     const cfg = conv.config;
     const maxRetry = cfg.retryCount;
@@ -1684,11 +2017,57 @@
   }
 
   /* ========== 渲染辅助 ========== */
-  function appendMsg(role, text, animate) {
+  function appendMsg(role, text, animate, attachments) {
     const div = document.createElement('div');
     div.className = 'msg ' + role;
-    div.textContent = text;
+    if (text) div.textContent = text;
     if (animate === false) div.style.animation = 'none';
+    // 渲染附件（图片/音频/视频/链接）
+    if (attachments && attachments.length) {
+      const box = document.createElement('div');
+      box.className = 'attachments';
+      attachments.forEach(a => {
+        if (a.type === 'image' && a.dataUrl) {
+          const img = document.createElement('img');
+          img.className = 'attachment-image';
+          img.src = a.dataUrl;
+          img.alt = a.name || 'image';
+          box.appendChild(img);
+        } else if (a.type === 'audio' && a.dataUrl) {
+          const audio = document.createElement('audio');
+          audio.className = 'attachment-audio';
+          audio.controls = true;
+          audio.src = a.dataUrl;
+          box.appendChild(audio);
+        } else if (a.type === 'video' && (a.dataUrl || a.url)) {
+          if (a.dataUrl) {
+            const v = document.createElement('video');
+            v.className = 'attachment-video';
+            v.controls = true;
+            v.preload = 'metadata';
+            v.src = a.dataUrl;
+            box.appendChild(v);
+          } else if (a.url) {
+            const l = document.createElement('a');
+            l.className = 'attachment-link';
+            l.href = a.url;
+            l.target = '_blank';
+            l.rel = 'noopener';
+            l.textContent = '🎬 视频链接：' + a.url;
+            box.appendChild(l);
+          }
+        } else if (a.type === 'link' && a.url) {
+          const l = document.createElement('a');
+          l.className = 'attachment-link';
+          l.href = a.url;
+          l.target = '_blank';
+          l.rel = 'noopener';
+          l.textContent = a.label || a.url;
+          box.appendChild(l);
+        }
+      });
+      div.prepend(box);
+    }
     messagesEl.appendChild(div);
     scrollToBottom();
     return div;
@@ -1710,12 +2089,16 @@
   }
 
   /* ========== 视频解析模态框 ========== */
+  let videoPendingFile = null;
   function updateVideoConfirm() {
-    videoConfirmBtn.disabled = !videoUrlInput.value.trim() || !videoPromptInput.value.trim() || isLoading;
+    const hasUrl = !!videoUrlInput.value.trim();
+    const hasPrompt = !!videoPromptInput.value.trim();
+    videoConfirmBtn.disabled = ((!hasUrl && !videoPendingFile) || !hasPrompt || isLoading);
   }
 
   function openVideoModal() {
     if (isLoading) return;
+    videoPendingFile = null;
     videoModal.style.display = 'flex';
     updateVideoConfirm();
     setTimeout(() => videoUrlInput.focus(), 50);
@@ -1725,6 +2108,7 @@
     videoModal.style.display = 'none';
     videoUrlInput.value = '';
     videoPromptInput.value = '';
+    videoPendingFile = null;
     videoConfirmBtn.disabled = true;
   }
 
@@ -1735,17 +2119,46 @@
   videoUrlInput.addEventListener('input', updateVideoConfirm);
   videoPromptInput.addEventListener('input', updateVideoConfirm);
 
-  videoConfirmBtn.addEventListener('click', () => {
+  // 视频模态框：选文件
+  const videoFileInputEl = document.getElementById('videoFileInput');
+  if (videoFileInputEl) {
+    videoFileInputEl.addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      videoPendingFile = f || null;
+      if (f) videoUrlInput.value = '';
+      updateVideoConfirm();
+    });
+  }
+  // 填了链接自动清空文件选择
+  videoUrlInput.addEventListener('input', () => {
+    if (videoFileInputEl && videoPendingFile) {
+      videoFileInputEl.value = '';
+      videoPendingFile = null;
+    }
+  });
+
+  videoConfirmBtn.addEventListener('click', async () => {
     const url = videoUrlInput.value.trim();
     const prompt = videoPromptInput.value.trim();
-    if (!url || !prompt || isLoading) return;
-    const message =
-      '【视频解析请求】\n' +
-      '视频链接：' + url + '\n' +
-      '提示词：' + prompt + '\n\n' +
-      '请基于以上视频链接解析视频内容，并根据提示词回答相关问题。';
+    if ((!url && !videoPendingFile) || !prompt || isLoading) return;
+
+    const conv = getConv();
+    if (!conv) { closeVideoModal(); return; }
+    let attach = null;
+    if (videoPendingFile) {
+      try {
+        const dataUrl = await fileToDataUrl(videoPendingFile);
+        const ext = (videoPendingFile.name.split('.').pop() || 'mp4').toLowerCase();
+        attach = { type: 'video', name: videoPendingFile.name, dataUrl, mime: videoPendingFile.type, ext, prompt };
+      } catch (e) {
+        appendMsg('error failure', '读取视频文件失败：' + e.message);
+        return;
+      }
+    } else {
+      attach = { type: 'video', url, prompt };
+    }
     closeVideoModal();
-    sendMessage(message);
+    sendMessage(prompt, [attach]);
   });
 
   [videoUrlInput, videoPromptInput].forEach(input => {
@@ -1758,6 +2171,142 @@
       }
     });
   });
+
+  /* ========== 图片 / 音频 按钮事件 + 录音 ========== */
+  imageBtn.addEventListener('click', () => imageFile.click());
+  imageFile.addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files || []);
+    imageFile.value = '';
+    for (const f of files) {
+      try {
+        const dataUrl = await fileToDataUrl(f);
+        const ext = (f.name.split('.').pop() || 'png').toLowerCase();
+        pendingAttachments.push({ type: 'image', name: f.name, dataUrl, mime: f.type, ext });
+      } catch (err) {
+        appendMsg('error failure', '读取图片失败：' + err.message);
+      }
+    }
+    renderPendingAttachments();
+    updateSendBtnState();
+  });
+
+  // 音频按钮：短按→弹选择(上传/录音)；长按直接录音
+  let audioChooseTimer = null;
+  audioBtn.addEventListener('mousedown', () => {
+    audioChooseTimer = setTimeout(() => { audioChooseTimer = null; startRecording(); }, 400);
+  });
+  function cancelAudioTimer() { if (audioChooseTimer) { clearTimeout(audioChooseTimer); audioChooseTimer = null; } }
+  audioBtn.addEventListener('mouseup', () => {
+    if (audioChooseTimer) { cancelAudioTimer(); chooseAudioMode(); }
+  });
+  audioBtn.addEventListener('mouseleave', cancelAudioTimer);
+  audioBtn.addEventListener('click', (e) => { if (e.detail === 0) return; }); // 由 mouseup 处理
+
+  // 移动端：长按录音，单击选模式
+  let touchTimer = null;
+  audioBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    touchTimer = setTimeout(() => { touchTimer = null; startRecording(); }, 500);
+  }, { passive: false });
+  audioBtn.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; chooseAudioMode(); }
+  });
+  audioBtn.addEventListener('touchcancel', () => { if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; } });
+
+  function chooseAudioMode() {
+    const mode = confirm('点击【确定】选择音频文件，点击【取消】开始录音。');
+    if (mode) { audioFile.click(); } else { startRecording(); }
+  }
+
+  audioFile.addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files || []);
+    audioFile.value = '';
+    for (const f of files) {
+      try {
+        const dataUrl = await fileToDataUrl(f);
+        const ext = (f.name.split('.').pop() || 'webm').toLowerCase();
+        pendingAttachments.push({ type: 'audio', name: f.name, dataUrl, mime: f.type, ext });
+      } catch (err) {
+        appendMsg('error failure', '读取音频失败：' + err.message);
+      }
+    }
+    renderPendingAttachments();
+    updateSendBtnState();
+  });
+
+  let recordingTimer = null;
+  let recordingStartTs = 0;
+  function fmtTime(sec) {
+    const s = Math.floor(sec);
+    return Math.floor(s / 60) + ':' + (s % 60).toString().padStart(2, '0');
+  }
+  async function startRecording() {
+    if (mediaRecorder) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('当前浏览器不支持录音，请上传音频文件');
+      return;
+    }
+    try {
+      recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingChunks = [];
+      const mrType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '';
+      mediaRecorder = new MediaRecorder(recordingStream, mrType ? { mimeType: mrType } : undefined);
+      mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) recordingChunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordingChunks, { type: (mediaRecorder && mediaRecorder.mimeType) || 'audio/webm' });
+        const ext = /\/(\w+)/.test(blob.type) ? (blob.type.match(/\/(\w+)/)[1] || 'webm') : 'webm';
+        const reader = new FileReader();
+        reader.onload = () => {
+          pendingAttachments.push({
+            type: 'audio',
+            name: 'recording_' + fmtTime((Date.now() - recordingStartTs) / 1000) + '.' + ext,
+            dataUrl: reader.result,
+            mime: blob.type,
+            ext
+          });
+          renderPendingAttachments();
+          updateSendBtnState();
+        };
+        reader.readAsDataURL(blob);
+        // 停止麦
+        if (recordingStream) recordingStream.getTracks().forEach(t => t.stop());
+        recordingStream = null;
+        mediaRecorder = null;
+        recordingChunks = [];
+      };
+      mediaRecorder.start();
+      recordingStartTs = Date.now();
+      audioRecordingBar.style.display = 'flex';
+      audioRecordingTime.textContent = '0:00';
+      if (recordingTimer) clearInterval(recordingTimer);
+      recordingTimer = setInterval(() => {
+        audioRecordingTime.textContent = fmtTime((Date.now() - recordingStartTs) / 1000);
+      }, 500);
+    } catch (e) {
+      alert('无法开始录音：' + e.message + '\n请检查麦克风权限');
+    }
+  }
+  function stopRecording() {
+    if (!mediaRecorder) return;
+    try { mediaRecorder.stop(); } catch (e) {}
+    audioRecordingBar.style.display = 'none';
+    if (recordingTimer) { clearInterval(recordingTimer); recordingTimer = null; }
+  }
+  audioStopBtn.addEventListener('click', () => {
+    stopRecording();
+    // 录音完成后自动发送（如果有音频+允许）
+    setTimeout(() => { if (!isLoading) sendMessage(); }, 120);
+  });
+
+  // 发送按钮可用状态（考虑附件/录音）
+  function updateSendBtnState() {
+    if (isLoading) return;
+    if (sendBtn.classList.contains('stop-mode')) return;
+    const hasText = msgInput.value.trim().length > 0;
+    const hasPending = pendingAttachments.length > 0;
+    sendBtn.disabled = !(hasText || hasPending);
+  }
 
   /* ========== 按钮事件 ========== */
   newChatBtn.addEventListener('click', () => { if (!isLoading) newConversation(); });

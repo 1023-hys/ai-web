@@ -1,0 +1,1834 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 聊天</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #f0f2f5;
+    color: #000;
+    overflow: hidden;
+  }
+
+  button { font-family: inherit; }
+
+  /* ========== 应用骨架：左侧栏 + 右侧聊天 ========== */
+  .app {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* 侧边栏 */
+  .sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    background: #fff;
+    border-right: 1px solid #e7ebef;
+    display: flex;
+    flex-direction: column;
+    transition: margin-left 0.25s ease;
+  }
+
+  .app.collapsed .sidebar {
+    margin-left: -260px;
+  }
+
+  .sidebar-header {
+    padding: 12px;
+    display: flex;
+    gap: 8px;
+    border-bottom: 1px solid #e7ebef;
+  }
+
+  .new-chat-btn {
+    flex: 1;
+    height: 40px;
+    border: none;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: box-shadow 0.2s;
+  }
+
+  .new-chat-btn:hover {
+    box-shadow: 0 4px 12px rgba(42, 171, 238, 0.4);
+  }
+
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .icon-btn:hover { background: #f0f2f5; }
+  .icon-btn svg { width: 20px; height: 20px; fill: #5d6770; }
+
+  .conv-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+
+  .conv-item {
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    transition: background 0.15s;
+  }
+
+  .conv-item:hover { background: #f0f2f5; }
+
+  .conv-item.active {
+    background: #e6f4fb;
+    color: #229ED9;
+  }
+
+  .conv-item .conv-name {
+    font-size: 14px;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .conv-actions { display: none; gap: 2px; }
+
+  .conv-item:hover .conv-actions { display: flex; }
+
+  .conv-act-btn {
+    width: 26px;
+    height: 26px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .conv-act-btn:hover { background: #e3e6ea; }
+  .conv-act-btn svg { width: 15px; height: 15px; fill: #5d6770; }
+  .conv-act-btn.danger:hover svg { fill: #e74c3c; }
+
+  .sidebar-footer {
+    padding: 8px;
+    border-top: 1px solid #e7ebef;
+  }
+
+  .settings-entry {
+    width: 100%;
+    height: 42px;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #5d6770;
+    transition: background 0.2s;
+  }
+
+  .settings-entry:hover { background: #f0f2f5; }
+  .settings-entry svg { width: 20px; height: 20px; fill: #2AABEE; }
+
+  /* 聊天区 */
+  .chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: #f0f2f5;
+  }
+
+  .chat-header {
+    height: 56px;
+    flex-shrink: 0;
+    background: #fff;
+    border-bottom: 1px solid #e7ebef;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+
+  .chat-header .title {
+    flex: 1;
+    font-size: 16px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .model-select {
+    height: 36px;
+    max-width: 220px;
+    padding: 0 10px;
+    border: 1px solid #e0e3e6;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 13px;
+    color: #000;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .model-select:focus { border-color: #2AABEE; }
+
+  .menu-btn { display: none; }
+
+  /* 桌面端侧栏收起后，在聊天头部显示展开按钮 */
+  .app.collapsed .menu-btn { display: flex; }
+
+  /* 消息列表 */
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .msg {
+    max-width: 80%;
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 15px;
+    line-height: 1.5;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    animation: msgIn 0.25s ease;
+  }
+
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg.user {
+    align-self: flex-end;
+    position: relative;
+    margin-bottom: 24px;
+    background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+    box-shadow: 0 2px 8px rgba(42, 171, 238, 0.25);
+  }
+
+  .msg.user .retry-icon {
+    position: absolute;
+    bottom: -24px;
+    right: 0;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    cursor: pointer;
+    opacity: 0;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    transition: opacity 0.2s, color 0.2s, border-color 0.2s;
+    z-index: 5;
+    user-select: none;
+  }
+
+  .msg.user:hover .retry-icon { opacity: 0.65; }
+  .msg.user .retry-icon:hover { opacity: 1; color: #2AABEE; border-color: #2AABEE; }
+
+  .msg.ai {
+    align-self: flex-start;
+    background: #fff;
+    color: #000;
+    border-bottom-left-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .msg.error {
+    align-self: center;
+    background: #fff0f0;
+    color: #e74c3c;
+    border: 1px solid #f5c6c6;
+    max-width: 90%;
+    text-align: center;
+    font-size: 14px;
+  }
+
+  .msg.system {
+    align-self: center;
+    background: transparent;
+    color: #9099a1;
+    font-size: 13px;
+    text-align: center;
+    max-width: 90%;
+  }
+
+  .msg.retry-status { font-size: 12px; color: #b7791f; }
+
+  .msg.retry-btn {
+    align-self: center;
+    background: #fff;
+    color: #2AABEE;
+    border: 1px solid #2AABEE;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 8px 18px;
+    border-radius: 18px;
+    max-width: none;
+    transition: all 0.2s;
+    animation: none;
+  }
+
+  .msg.retry-btn:hover {
+    background: #2AABEE;
+    color: #fff;
+  }
+
+  .typing {
+    align-self: flex-start;
+    background: #fff;
+    padding: 12px 16px;
+    border-radius: 16px;
+    border-bottom-left-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    display: flex;
+    gap: 4px;
+  }
+
+  .typing span {
+    width: 8px;
+    height: 8px;
+    background: #b0b6bb;
+    border-radius: 50%;
+    animation: typing 1.4s infinite;
+  }
+
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes typing {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-6px); opacity: 1; }
+  }
+
+  /* 输入栏 */
+  .input-bar {
+    flex-shrink: 0;
+    background: #fff;
+    border-top: 1px solid #e7ebef;
+    padding: 10px 12px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+
+  .input-bar textarea {
+    flex: 1;
+    max-height: 120px;
+    min-height: 42px;
+    padding: 10px 14px;
+    border: 2px solid #e0e3e6;
+    border-radius: 22px;
+    font-size: 15px;
+    color: #000;
+    outline: none;
+    resize: none;
+    line-height: 1.4;
+    transition: border-color 0.2s;
+  }
+
+  .input-bar textarea:focus { border-color: #2AABEE; }
+
+  .input-bar .attach-btn,
+  .input-bar .send-btn {
+    width: 42px;
+    height: 42px;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+
+  .input-bar .attach-btn { background: transparent; }
+  .input-bar .attach-btn:hover { background: #f0f2f5; }
+  .input-bar .attach-btn svg { width: 22px; height: 22px; fill: #2AABEE; }
+
+  .input-bar .send-btn {
+    background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%);
+    color: #fff;
+  }
+
+  .input-bar .send-btn:hover { box-shadow: 0 4px 12px rgba(42, 171, 238, 0.4); }
+
+  .input-bar .send-btn:disabled {
+    background: #c4c9cc;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .input-bar .send-btn.stop-mode {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
+    cursor: pointer;
+  }
+
+  .input-bar .send-btn.stop-mode:hover { box-shadow: 0 4px 12px rgba(231, 76, 60, 0.45); }
+  .input-bar .send-btn.stop-mode svg { width: 18px; height: 18px; }
+  .input-bar .send-btn svg { width: 20px; height: 20px; fill: #fff; }
+
+  /* 滚动条 */
+  .messages::-webkit-scrollbar,
+  .conv-list::-webkit-scrollbar,
+  .config-card::-webkit-scrollbar { width: 6px; }
+  .messages::-webkit-scrollbar-thumb,
+  .conv-list::-webkit-scrollbar-thumb,
+  .config-card::-webkit-scrollbar-thumb { background: #c4c9cc; border-radius: 3px; }
+  .messages::-webkit-scrollbar-track,
+  .conv-list::-webkit-scrollbar-track,
+  .config-card::-webkit-scrollbar-track { background: transparent; }
+
+  /* ========== 设置窗口 ========== */
+  .config-page {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 100;
+    transition: opacity 0.3s, visibility 0.3s;
+  }
+
+  .config-page.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .config-card {
+    width: 100%;
+    max-width: 460px;
+    max-height: calc(100vh - 48px);
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    overflow-y: auto;
+    padding: 28px 24px;
+    animation: modalIn 0.2s ease;
+  }
+
+  @keyframes modalIn {
+    from { opacity: 0; transform: translateY(12px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .config-header { text-align: center; margin-bottom: 24px; }
+
+  .config-header h1 { font-size: 21px; font-weight: 700; margin-bottom: 6px; }
+  .config-header p { font-size: 14px; color: #707579; line-height: 1.5; }
+
+  .config-form .form-group { margin-bottom: 16px; }
+
+  .config-form label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #5d6770;
+    margin-bottom: 6px;
+  }
+
+  .config-form input[type="text"],
+  .config-form input[type="password"],
+  .config-form input[type="number"],
+  .config-form select {
+    width: 100%;
+    height: 46px;
+    padding: 0 14px;
+    border: 2px solid #e0e3e6;
+    border-radius: 10px;
+    font-size: 15px;
+    color: #000;
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: inherit;
+    background: #fff;
+  }
+
+  .config-form input:focus,
+  .config-form select:focus { border-color: #2AABEE; }
+  .config-form input::placeholder { color: #b0b6bb; }
+
+  .config-form input[type="number"]::-webkit-outer-spin-button,
+  .config-form input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .config-form input[type="number"] { -moz-appearance: textfield; }
+
+  .config-form .hint {
+    font-size: 12px;
+    color: #9099a1;
+    margin-top: 6px;
+    line-height: 1.4;
+  }
+
+  .config-form .row-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #5d6770;
+    margin-bottom: 6px;
+  }
+
+  .model-rows { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+
+  .model-row { display: flex; gap: 8px; }
+
+  .model-row input { flex: 1; }
+
+  .model-row .row-del {
+    width: 46px;
+    height: 46px;
+    border: none;
+    background: #fff0f0;
+    border-radius: 10px;
+    cursor: pointer;
+    color: #e74c3c;
+    font-size: 22px;
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+
+  .model-row .row-del:hover { background: #ffe0e0; }
+
+  .add-model-btn {
+    width: 100%;
+    height: 40px;
+    border: 1px dashed #c4c9cc;
+    border-radius: 10px;
+    background: transparent;
+    color: #5d6770;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+  }
+
+  .add-model-btn:hover { border-color: #2AABEE; color: #2AABEE; }
+
+  .config-form .start-btn {
+    width: 100%;
+    height: 50px;
+    border: none;
+    border-radius: 25px;
+    background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+    box-shadow: 0 6px 20px rgba(42, 171, 238, 0.3);
+    transition: all 0.2s;
+  }
+
+  .config-form .start-btn:hover { box-shadow: 0 8px 28px rgba(42, 171, 238, 0.45); transform: translateY(-1px); }
+
+  .config-form .secondary-btn,
+  .config-form .danger-btn {
+    width: 100%;
+    height: 42px;
+    border: none;
+    border-radius: 21px;
+    background: transparent;
+    font-size: 14px;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  .config-form .secondary-btn { color: #9099a1; }
+  .config-form .secondary-btn:hover { background: #f0f2f5; color: #5d6770; }
+  .config-form .danger-btn { color: #e74c3c; }
+  .config-form .danger-btn:hover { background: #fff0f0; }
+
+  .config-form .error-msg {
+    color: #e74c3c;
+    font-size: 13px;
+    margin-top: 12px;
+    text-align: center;
+    min-height: 18px;
+  }
+
+  /* 视频解析模态框 */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 150;
+    padding: 20px;
+  }
+
+  .modal-card {
+    width: 100%;
+    max-width: 480px;
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    animation: modalIn 0.2s ease;
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #e7ebef;
+  }
+
+  .modal-header h2 { font-size: 17px; font-weight: 700; }
+
+  .modal-close {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    font-size: 24px;
+    color: #9099a1;
+    cursor: pointer;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  .modal-close:hover { background: #f0f2f5; }
+  .modal-body { padding: 20px; }
+  .modal-form-group { margin-bottom: 16px; }
+  .modal-form-group label { display: block; font-size: 13px; font-weight: 600; color: #5d6770; margin-bottom: 6px; }
+
+  .modal-form-group input,
+  .modal-form-group textarea {
+    width: 100%;
+    padding: 12px 14px;
+    border: 2px solid #e0e3e6;
+    border-radius: 10px;
+    font-size: 14px;
+    color: #000;
+    outline: none;
+    font-family: inherit;
+    transition: border-color 0.2s;
+  }
+
+  .modal-form-group input:focus,
+  .modal-form-group textarea:focus { border-color: #2AABEE; }
+  .modal-form-group textarea { min-height: 90px; resize: vertical; line-height: 1.5; }
+  .modal-hint { font-size: 12px; color: #9099a1; line-height: 1.4; }
+
+  .modal-footer {
+    display: flex;
+    gap: 10px;
+    padding: 16px 20px;
+    border-top: 1px solid #e7ebef;
+    justify-content: flex-end;
+  }
+
+  .modal-btn {
+    height: 40px;
+    padding: 0 22px;
+    border: none;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .modal-btn.cancel { background: #f0f2f5; color: #5d6770; }
+  .modal-btn.cancel:hover { background: #e3e6ea; }
+  .modal-btn.confirm { background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%); color: #fff; box-shadow: 0 4px 12px rgba(42, 171, 238, 0.3); }
+  .modal-btn.confirm:hover { box-shadow: 0 6px 18px rgba(42, 171, 238, 0.45); }
+  .modal-btn.confirm:disabled { background: #c4c9cc; box-shadow: none; cursor: not-allowed; }
+
+  /* 过载切换模型弹窗 */
+  .switch-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 20px;
+  }
+
+  .switch-card {
+    width: 100%;
+    max-width: 420px;
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    animation: modalIn 0.2s ease;
+  }
+
+  .switch-card h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+  .switch-card .switch-sub { font-size: 13px; color: #707579; margin-bottom: 16px; word-break: break-all; }
+
+  .switch-options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+
+  .switch-option {
+    width: 100%;
+    height: 44px;
+    border: 1px solid #e0e3e6;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 14px;
+    text-align: left;
+    padding: 0 14px;
+    transition: all 0.15s;
+  }
+
+  .switch-option:hover { border-color: #2AABEE; background: #f0f9ff; }
+
+  .switch-actions { display: flex; gap: 8px; }
+
+  .switch-actions button {
+    flex: 1;
+    height: 40px;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+
+  .switch-continue { background: #f0f2f5; color: #5d6770; }
+  .switch-continue:hover { background: #e3e6ea; }
+  .switch-abort { background: linear-gradient(135deg, #e74c3c, #c0392b); color: #fff; }
+
+  /* 响应式：窄屏侧边栏变抽屉 */
+  @media (max-width: 820px) {
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      z-index: 50;
+      transform: translateX(-100%);
+      box-shadow: 2px 0 12px rgba(0, 0, 0, 0.12);
+    }
+    .sidebar.open { transform: translateX(0); }
+    .menu-btn { display: flex; }
+    .collapse-btn { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <!-- 侧边栏 -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <button class="new-chat-btn" id="newChatBtn">+ 新建对话</button>
+      <button class="icon-btn collapse-btn" id="collapseBtn" title="折叠侧栏">
+        <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+      </button>
+    </div>
+    <div class="conv-list" id="convList"></div>
+    <div class="sidebar-footer">
+      <button class="settings-entry" id="settingsEntryBtn">
+        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.4.11-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.11.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.4-.11.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.21.07-.47-.11-.61l-2.03-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+        设置
+      </button>
+    </div>
+  </aside>
+
+  <!-- 聊天区 -->
+  <main class="chat" id="chatPage">
+    <div class="chat-header">
+      <button class="icon-btn menu-btn" id="menuBtn" title="对话列表">
+        <svg viewBox="0 0 24 24"><path d="M3 6h18v2H3zM3 11h18v2H3zM3 18h18v2H3z"/></svg>
+      </button>
+      <div class="title" id="chatTitle">AI 聊天</div>
+      <select class="model-select" id="modelSelect" title="选择模型"></select>
+      <button class="icon-btn" id="resetBtn" title="设置">
+        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.4.11-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.11.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.4-.11.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.21.07-.47-.11-.61l-2.03-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+      </button>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="msg system">已连接，开始与 AI 对话吧 👋</div>
+    </div>
+
+    <div class="input-bar">
+      <button class="attach-btn" id="videoBtn" title="视频解析">
+        <svg viewBox="0 0 24 24"><path d="M17 10.5V7a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1v-3.5l4 4v-11l-4 4z"/></svg>
+      </button>
+      <textarea id="msgInput" placeholder="输入消息..." rows="1"></textarea>
+      <button class="send-btn" id="sendBtn" disabled>
+        <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      </button>
+    </div>
+  </main>
+</div>
+
+<!-- ========== 设置窗口 ========== -->
+<div class="config-page hidden" id="configPage">
+  <div class="config-card">
+    <div class="config-header">
+      <h1>对话设置</h1>
+      <p>配置当前对话的 API、模型与重试参数（每个对话独立）</p>
+    </div>
+
+    <div class="config-form">
+      <div class="form-group">
+        <label for="convName">对话名称</label>
+        <input type="text" id="convName" placeholder="新对话" autocomplete="off">
+      </div>
+
+      <div class="form-group">
+        <label for="apiEndpoint">API 端点</label>
+        <input type="text" id="apiEndpoint" placeholder="https://api.example.com/v1/chat/completions" autocomplete="off">
+        <div class="hint">OpenAI 兼容的 chat/completions 接口地址</div>
+      </div>
+
+      <div class="form-group">
+        <label for="apiKey">API Key</label>
+        <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off">
+        <div class="hint">保存在浏览器本地（localStorage）</div>
+      </div>
+
+      <div class="form-group">
+        <div class="row-label">模型列表（发送时可在此切换）</div>
+        <div class="model-rows" id="modelRows"></div>
+        <button class="add-model-btn" id="addModelBtn" type="button">+ 添加模型</button>
+      </div>
+
+      <div class="form-group">
+        <label for="defaultModel">默认模型</label>
+        <select id="defaultModel"></select>
+        <div class="hint">新建/重置时默认使用的模型</div>
+      </div>
+
+      <div class="form-group">
+        <label for="maxTokens">最大 token 数</label>
+        <input type="number" id="maxTokens" min="0" max="200000" value="0" autocomplete="off">
+        <div class="hint">0 表示无限制（不传 max_tokens）</div>
+      </div>
+
+      <div class="form-group">
+        <label for="contextLimit">上下文消息数</label>
+        <input type="number" id="contextLimit" min="0" max="1000" value="0" autocomplete="off">
+        <div class="hint">每次发送携带的最近消息条数，0 表示无限制（发全部历史）</div>
+      </div>
+
+      <div class="form-group">
+        <label for="retryCount">自动重试次数</label>
+        <input type="number" id="retryCount" min="0" max="50" value="10" autocomplete="off">
+        <div class="hint">模型访问量过大时自动重试的次数，0 表示不重试</div>
+      </div>
+
+      <div class="form-group">
+        <label for="retryInterval">重试间隔秒数</label>
+        <input type="number" id="retryInterval" min="1" max="60" value="2" autocomplete="off">
+        <div class="hint">每次重试前的等待秒数，逐次递增（上限 15s）</div>
+      </div>
+
+      <button class="start-btn" id="startBtn">保存并返回</button>
+      <button class="secondary-btn" id="clearChatBtn" type="button">清空当前对话</button>
+      <button class="danger-btn" id="deleteChatBtn" type="button">删除当前对话</button>
+      <div class="error-msg" id="configError"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 视频解析模态框 ========== -->
+<div class="modal-overlay" id="videoModal" style="display: none;">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2>视频解析</h2>
+      <button class="modal-close" id="videoModalClose" title="关闭">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-form-group">
+        <label for="videoUrl">视频链接</label>
+        <input type="text" id="videoUrl" placeholder="https://..." autocomplete="off">
+      </div>
+      <div class="modal-form-group">
+        <label for="videoPrompt">提示词</label>
+        <textarea id="videoPrompt" placeholder="告诉 AI 你想从视频中了解什么..."></textarea>
+      </div>
+      <div class="modal-hint">将视频链接与提示词组合后发送给 AI 进行解析</div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn cancel" id="videoCancelBtn">取消</button>
+      <button class="modal-btn confirm" id="videoConfirmBtn" disabled>发送给 AI</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 过载切换模型弹窗 ========== -->
+<div class="switch-overlay" id="switchModal" style="display: none;">
+  <div class="switch-card">
+    <h3>模型访问量过大</h3>
+    <div class="switch-sub">当前模型：<span id="switchCurrent"></span></div>
+    <div class="switch-options" id="switchOptions"></div>
+    <div class="switch-actions">
+      <button class="switch-continue" id="switchContinue">继续用当前模型重试</button>
+      <button class="switch-abort" id="switchAbort">中断请求</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ========== 元素引用 ========== */
+  const app = document.getElementById('app');
+  const sidebar = document.getElementById('sidebar');
+  const convListEl = document.getElementById('convList');
+  const newChatBtn = document.getElementById('newChatBtn');
+  const collapseBtn = document.getElementById('collapseBtn');
+  const menuBtn = document.getElementById('menuBtn');
+  const settingsEntryBtn = document.getElementById('settingsEntryBtn');
+
+  const chatTitle = document.getElementById('chatTitle');
+  const modelSelect = document.getElementById('modelSelect');
+  const messagesEl = document.getElementById('messages');
+  const msgInput = document.getElementById('msgInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const videoBtn = document.getElementById('videoBtn');
+
+  const configPage = document.getElementById('configPage');
+  const convNameInput = document.getElementById('convName');
+  const apiEndpointInput = document.getElementById('apiEndpoint');
+  const apiKeyInput = document.getElementById('apiKey');
+  const modelRowsEl = document.getElementById('modelRows');
+  const addModelBtn = document.getElementById('addModelBtn');
+  const defaultModelSelect = document.getElementById('defaultModel');
+  const maxTokensInput = document.getElementById('maxTokens');
+  const contextLimitInput = document.getElementById('contextLimit');
+  const retryCountInput = document.getElementById('retryCount');
+  const retryIntervalInput = document.getElementById('retryInterval');
+  const startBtn = document.getElementById('startBtn');
+  const clearChatBtn = document.getElementById('clearChatBtn');
+  const deleteChatBtn = document.getElementById('deleteChatBtn');
+  const configError = document.getElementById('configError');
+
+  const videoModal = document.getElementById('videoModal');
+  const videoModalClose = document.getElementById('videoModalClose');
+  const videoCancelBtn = document.getElementById('videoCancelBtn');
+  const videoConfirmBtn = document.getElementById('videoConfirmBtn');
+  const videoUrlInput = document.getElementById('videoUrl');
+  const videoPromptInput = document.getElementById('videoPrompt');
+
+  const switchModal = document.getElementById('switchModal');
+  const switchCurrent = document.getElementById('switchCurrent');
+  const switchOptions = document.getElementById('switchOptions');
+  const switchContinue = document.getElementById('switchContinue');
+  const switchAbort = document.getElementById('switchAbort');
+
+  /* ========== 全局状态 ========== */
+  let conversations = [];
+  let currentId = null;
+  let isLoading = false;
+  let currentAbortController = null;
+  let retryStatusEl = null;
+
+  const STORAGE_KEY = 'ai_chat_conversations_v1';
+  const MAX_BACKOFF_MS = 15000;
+  const SEND_ICON = '<svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
+  const STOP_ICON = '<svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>';
+
+  /* ========== 数据层 ========== */
+  function uid() {
+    return 'conv_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+  }
+
+  function defaultConfig(prev) {
+    const base = {
+      endpoint: '',
+      apiKey: '',
+      models: ['gpt-3.5-turbo'],
+      activeModel: 'gpt-3.5-turbo',
+      maxTokens: 0,
+      contextLimit: 0,
+      retryCount: 10,
+      retryInterval: 2
+    };
+    if (prev) {
+      base.endpoint = prev.endpoint || '';
+      base.apiKey = prev.apiKey || '';
+      base.models = (prev.models && prev.models.length) ? prev.models.slice() : ['gpt-3.5-turbo'];
+      base.activeModel = prev.activeModel || base.models[0];
+      base.maxTokens = prev.maxTokens ?? 0;
+      base.contextLimit = prev.contextLimit ?? 0;
+      base.retryCount = prev.retryCount ?? 10;
+      base.retryInterval = prev.retryInterval ?? 2;
+    }
+    return base;
+  }
+
+  function getConv() {
+    return conversations.find(c => c.id === currentId) || null;
+  }
+
+  function saveConversations() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ conversations, currentId }));
+    } catch (e) {
+      console.error('[AI Chat] 保存失败:', e);
+    }
+  }
+
+  function loadConversations() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (Array.isArray(data.conversations)) conversations = data.conversations;
+        if (data.currentId && conversations.find(c => c.id === data.currentId)) {
+          currentId = data.currentId;
+        }
+      }
+    } catch (e) {
+      console.error('[AI Chat] 加载失败:', e);
+    }
+    // 数据兼容：确保每个对话结构完整
+    conversations.forEach(c => {
+      if (!c.config) c.config = defaultConfig();
+      c.config = Object.assign(defaultConfig(), c.config);
+      if (!Array.isArray(c.config.models) || !c.config.models.length) c.config.models = ['gpt-3.5-turbo'];
+      if (!c.config.activeModel || !c.config.models.includes(c.config.activeModel)) {
+        c.config.activeModel = c.config.models[0];
+      }
+      if (!Array.isArray(c.messages)) c.messages = [];
+    });
+    if (conversations.length === 0) {
+      const c = { id: uid(), name: '新对话', config: defaultConfig(), messages: [] };
+      conversations.push(c);
+      currentId = c.id;
+    }
+    if (!currentId || !getConv()) currentId = conversations[0].id;
+  }
+
+  function newConversation() {
+    const prev = getConv();
+    const c = {
+      id: uid(),
+      name: '新对话',
+      config: defaultConfig(prev ? prev.config : null),
+      messages: []
+    };
+    conversations.unshift(c);
+    currentId = c.id;
+    saveConversations();
+    renderConversationList();
+    renderChat();
+    closeSidebarOnMobile();
+    openSettings();
+    setTimeout(() => convNameInput.focus(), 100);
+  }
+
+  function switchConversation(id) {
+    if (isLoading) return;
+    if (id === currentId) { closeSidebarOnMobile(); return; }
+    currentId = id;
+    saveConversations();
+    renderConversationList();
+    renderChat();
+    closeSidebarOnMobile();
+  }
+
+  function renameConversation(id) {
+    const c = conversations.find(x => x.id === id);
+    if (!c) return;
+    const name = prompt('重命名对话：', c.name);
+    if (name !== null && name.trim()) {
+      c.name = name.trim();
+      saveConversations();
+      renderConversationList();
+      if (id === currentId) chatTitle.textContent = c.name;
+    }
+  }
+
+  function deleteConversation(id) {
+    const c = conversations.find(x => x.id === id);
+    if (!c) return;
+    if (!confirm('确定删除对话「' + c.name + '」？此操作不可撤销。')) return;
+    conversations = conversations.filter(x => x.id !== id);
+    if (conversations.length === 0) {
+      const nc = { id: uid(), name: '新对话', config: defaultConfig(), messages: [] };
+      conversations.push(nc);
+      currentId = nc.id;
+    } else {
+      currentId = conversations[0].id;
+    }
+    saveConversations();
+    renderConversationList();
+    renderChat();
+  }
+
+  /* ========== 渲染 ========== */
+  function renderConversationList() {
+    convListEl.innerHTML = '';
+    conversations.forEach(c => {
+      const item = document.createElement('div');
+      item.className = 'conv-item' + (c.id === currentId ? ' active' : '');
+      item.dataset.id = c.id;
+
+      const name = document.createElement('div');
+      name.className = 'conv-name';
+      name.textContent = c.name || '未命名对话';
+
+      const actions = document.createElement('div');
+      actions.className = 'conv-actions';
+
+      const renameBtn = document.createElement('button');
+      renameBtn.className = 'conv-act-btn';
+      renameBtn.title = '重命名';
+      renameBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 000-1.41l-2.34-2.34a.996.996 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';
+      renameBtn.onclick = (e) => { e.stopPropagation(); renameConversation(c.id); };
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'conv-act-btn danger';
+      delBtn.title = '删除';
+      delBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+      delBtn.onclick = (e) => { e.stopPropagation(); deleteConversation(c.id); };
+
+      actions.appendChild(renameBtn);
+      actions.appendChild(delBtn);
+      item.appendChild(name);
+      item.appendChild(actions);
+      item.onclick = () => switchConversation(c.id);
+      convListEl.appendChild(item);
+    });
+  }
+
+  function renderModelSelect() {
+    const conv = getConv();
+    modelSelect.innerHTML = '';
+    if (!conv) return;
+    conv.config.models.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      if (m === conv.config.activeModel) opt.selected = true;
+      modelSelect.appendChild(opt);
+    });
+  }
+
+  function renderMessages() {
+    const conv = getConv();
+    messagesEl.innerHTML = '';
+    if (!conv) return;
+    if (conv.messages.length === 0) {
+      const sys = document.createElement('div');
+      sys.className = 'msg system';
+      sys.textContent = '已连接，开始与 AI 对话吧 👋';
+      messagesEl.appendChild(sys);
+      return;
+    }
+    conv.messages.forEach((m, idx) => {
+      const el = appendMsg(m.role === 'assistant' ? 'ai' : m.role, m.content, false);
+      if (m.role === 'user' && el) {
+        el.dataset.idx = idx;
+        addRetryIcon(el, idx);
+      }
+    });
+    scrollToBottom();
+  }
+
+  function renderChat() {
+    const conv = getConv();
+    if (!conv) return;
+    chatTitle.textContent = conv.name || '未命名对话';
+    renderModelSelect();
+    renderMessages();
+    sendBtn.disabled = msgInput.value.trim().length === 0 || isLoading;
+  }
+
+  /* ========== 设置窗口 ========== */
+  function addModelRow(value) {
+    const row = document.createElement('div');
+    row.className = 'model-row';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = '模型名称，如 gpt-3.5-turbo';
+    input.value = value || '';
+    input.autocomplete = 'off';
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'row-del';
+    del.textContent = '×';
+    del.title = '删除该模型';
+    del.onclick = () => {
+      row.remove();
+      syncDefaultModelOptions();
+    };
+    input.addEventListener('input', syncDefaultModelOptions);
+    row.appendChild(input);
+    row.appendChild(del);
+    modelRowsEl.appendChild(row);
+    syncDefaultModelOptions();
+  }
+
+  function collectModels() {
+    return Array.from(modelRowsEl.querySelectorAll('.model-row input'))
+      .map(i => i.value.trim())
+      .filter(m => m.length > 0);
+  }
+
+  function syncDefaultModelOptions() {
+    const models = collectModels();
+    const prev = defaultModelSelect.value;
+    defaultModelSelect.innerHTML = '';
+    if (models.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = '（请先在上方添加模型）';
+      defaultModelSelect.appendChild(opt);
+      return;
+    }
+    models.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      if (m === prev) opt.selected = true;
+      defaultModelSelect.appendChild(opt);
+    });
+    if (!models.includes(defaultModelSelect.value) && defaultModelSelect.options.length > 0) {
+      defaultModelSelect.selectedIndex = 0;
+    }
+  }
+
+  function openSettings() {
+    const conv = getConv();
+    if (!conv) return;
+    closeVideoModal();
+    convNameInput.value = conv.name || '';
+    apiEndpointInput.value = conv.config.endpoint || '';
+    apiKeyInput.value = conv.config.apiKey || '';
+    modelRowsEl.innerHTML = '';
+    (conv.config.models.length ? conv.config.models : ['gpt-3.5-turbo']).forEach(m => addModelRow(m));
+    syncDefaultModelOptions();
+    defaultModelSelect.value = conv.config.activeModel || collectModels()[0] || '';
+    maxTokensInput.value = conv.config.maxTokens ?? 0;
+    contextLimitInput.value = conv.config.contextLimit ?? 0;
+    retryCountInput.value = conv.config.retryCount ?? 10;
+    retryIntervalInput.value = conv.config.retryInterval ?? 2;
+    configError.textContent = '';
+    configPage.classList.remove('hidden');
+    setTimeout(() => convNameInput.focus(), 100);
+  }
+
+  function closeSettings() {
+    configPage.classList.add('hidden');
+  }
+
+  function saveSettings() {
+    const conv = getConv();
+    if (!conv) return;
+    const name = convNameInput.value.trim() || '未命名对话';
+    const endpoint = apiEndpointInput.value.trim();
+    const apiKey = apiKeyInput.value.trim();
+    const models = collectModels();
+    let activeModel = defaultModelSelect.value;
+    const maxTokens = Math.max(0, Math.min(200000, parseInt(maxTokensInput.value, 10) || 0));
+    const contextLimit = Math.max(0, Math.min(1000, parseInt(contextLimitInput.value, 10) || 0));
+    const retryCount = Math.max(0, Math.min(50, parseInt(retryCountInput.value, 10) || 0));
+    const retryInterval = Math.max(1, Math.min(60, parseInt(retryIntervalInput.value, 10) || 1));
+
+    if (!endpoint) { configError.textContent = '请填写 API 端点'; return; }
+    if (!apiKey) { configError.textContent = '请填写 API Key'; return; }
+    if (models.length === 0) { configError.textContent = '请至少添加一个模型'; return; }
+    if (!activeModel || !models.includes(activeModel)) activeModel = models[0];
+
+    // 智能补全端点
+    let finalEndpoint = endpoint;
+    try {
+      const u = new URL(endpoint);
+      const path = u.pathname;
+      if (/\/chat\/completions/.test(path)) {
+        u.pathname = path.replace(/\/+$/, '');
+        finalEndpoint = u.toString();
+      } else {
+        let base = path.replace(/\/+$/, '');
+        if (/\/v1$/.test(base)) base += '/chat/completions';
+        else if (base === '') base = '/v1/chat/completions';
+        else if (!/\/v1\//.test(base)) base += '/v1/chat/completions';
+        else base += '/chat/completions';
+        u.pathname = base;
+        finalEndpoint = u.toString();
+      }
+    } catch (e) {
+      configError.textContent = 'API 端点格式不正确，请输入完整的 URL';
+      return;
+    }
+
+    conv.name = name;
+    conv.config.endpoint = finalEndpoint;
+    conv.config.apiKey = apiKey;
+    conv.config.models = models;
+    conv.config.activeModel = activeModel;
+    conv.config.maxTokens = maxTokens;
+    conv.config.contextLimit = contextLimit;
+    conv.config.retryCount = retryCount;
+    conv.config.retryInterval = retryInterval;
+
+    saveConversations();
+    renderConversationList();
+    renderChat();
+    closeSettings();
+    setTimeout(() => msgInput.focus(), 100);
+  }
+
+  /* ========== 输入框 & 发送 ========== */
+  msgInput.addEventListener('input', () => {
+    msgInput.style.height = 'auto';
+    msgInput.style.height = Math.min(msgInput.scrollHeight, 120) + 'px';
+    if (!sendBtn.classList.contains('stop-mode')) {
+      sendBtn.disabled = msgInput.value.trim().length === 0 || isLoading;
+    }
+  });
+
+  msgInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!sendBtn.disabled) sendMessage();
+    }
+  });
+
+  sendBtn.addEventListener('click', () => {
+    if (sendBtn.classList.contains('stop-mode')) {
+      if (currentAbortController) currentAbortController.abort();
+      return;
+    }
+    if (!sendBtn.disabled) sendMessage();
+  });
+
+  function sendMessage(externalText) {
+    const conv = getConv();
+    if (!conv) return;
+    const text = (externalText !== undefined ? externalText : msgInput.value).trim();
+    if (!text || isLoading) return;
+
+    // 清理上一次失败/中断的痕迹
+    removeLastFailure();
+
+    if (!conv.config.endpoint || !conv.config.apiKey) {
+      appendMsg('error', '请先在设置中配置 API 端点与 Key');
+      openSettings();
+      return;
+    }
+    if (!conv.config.models.length) {
+      appendMsg('error', '请在设置中至少添加一个模型');
+      openSettings();
+      return;
+    }
+
+    conv.messages.push({ role: 'user', content: text });
+    saveConversations();
+    const userEl = appendMsg('user', text);
+    if (userEl) {
+      userEl.dataset.idx = conv.messages.length - 1;
+      addRetryIcon(userEl, conv.messages.length - 1);
+    }
+
+    if (externalText === undefined) {
+      msgInput.value = '';
+      msgInput.style.height = 'auto';
+    }
+    sendBtn.disabled = true;
+
+    const typingEl = showTyping();
+    isLoading = true;
+    setSendBtnMode('stop');
+
+    callAI(conv)
+      .then(reply => {
+        typingEl.remove();
+        appendMsg('ai', reply);
+        conv.messages.push({ role: 'assistant', content: reply });
+        saveConversations();
+      })
+      .catch(err => {
+        typingEl.remove();
+        if (err && err.name === 'AbortError') {
+          appendMsg('system failure', '已中断');
+        } else {
+          appendMsg('error failure', '请求失败：' + err.message);
+          console.error('[AI Chat] 请求失败:', err);
+        }
+      })
+      .finally(() => {
+        clearRetryStatus();
+        isLoading = false;
+        currentAbortController = null;
+        setSendBtnMode('send');
+        msgInput.focus();
+      });
+  }
+
+  // 为 user 消息附加重试图标
+  function addRetryIcon(div, idx) {
+    const icon = document.createElement('span');
+    icon.className = 'retry-icon';
+    icon.textContent = '🔄';
+    icon.title = '从此处重新生成（后续消息将被清除）';
+    icon.onclick = (e) => { e.stopPropagation(); retryMessage(idx); };
+    div.appendChild(icon);
+  }
+
+  function removeLastFailure() {
+    const list = messagesEl.querySelectorAll('.msg.failure');
+    if (list.length) list[list.length - 1].remove();
+  }
+
+  // 从指定 user 消息处重新生成其 AI 回复（保留后续对话）
+  function retryMessage(idx) {
+    const conv = getConv();
+    if (!conv || isLoading) return;
+    if (idx < 0 || idx >= conv.messages.length || conv.messages[idx].role !== 'user') return;
+    if (!conv.config.endpoint || !conv.config.apiKey) {
+      appendMsg('error failure', '请先在设置中配置 API 端点与 Key');
+      openSettings();
+      return;
+    }
+    // 完整历史备份；上下文只取到该 user（含），不含旧回复与后续
+    const fullMessages = conv.messages.slice();
+    const hadOldAi = idx + 1 < fullMessages.length && fullMessages[idx + 1].role === 'assistant';
+    const context = fullMessages.slice(0, idx + 1);
+    // DOM：移除该 user 之后、到下一个 user 之前的所有非 user 节点（旧回复/错误/中断/typing）
+    const target = messagesEl.querySelector('.msg.user[data-idx="' + idx + '"]');
+    if (target) {
+      let next = target.nextElementSibling;
+      while (next && !next.classList.contains('user')) {
+        const r = next; next = next.nextElementSibling; r.remove();
+      }
+    }
+    const typingEl = showTyping();
+    isLoading = true;
+    setSendBtnMode('stop');
+    callAI(conv, context)
+      .then(reply => {
+        typingEl.remove();
+        // 用 0..idx + 新回复 + 后续（跳过旧回复）重组，后续对话保留
+        const tail = fullMessages.slice(hadOldAi ? idx + 2 : idx + 1);
+        conv.messages = context.concat([{ role: 'assistant', content: reply }], tail);
+        saveConversations();
+        renderMessages();
+      })
+      .catch(err => {
+        typingEl.remove();
+        // 失败/中断：恢复完整历史并重建（后续保留），再追加错误提示
+        conv.messages = fullMessages;
+        saveConversations();
+        renderMessages();
+        if (err && err.name === 'AbortError') {
+          appendMsg('system failure', '已中断');
+        } else {
+          appendMsg('error failure', '请求失败：' + err.message);
+          console.error('[AI Chat] 请求失败:', err);
+        }
+      })
+      .finally(() => {
+        clearRetryStatus();
+        isLoading = false;
+        currentAbortController = null;
+        setSendBtnMode('send');
+        msgInput.focus();
+      });
+  }
+
+  /* ========== AI 调用 ========== */
+  async function fetchOnce(conv, model, signal, contextMessages) {
+    const cfg = conv.config;
+    let msgs = contextMessages || conv.messages;
+    if (cfg.contextLimit > 0 && msgs.length > cfg.contextLimit) {
+      msgs = msgs.slice(-cfg.contextLimit);
+    }
+    const body = { model: model, messages: msgs, stream: false };
+    if (cfg.maxTokens > 0) body.max_tokens = cfg.maxTokens;
+
+    let res;
+    try {
+      res = await fetch(cfg.endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + cfg.apiKey
+        },
+        body: JSON.stringify(body),
+        signal: signal
+      });
+    } catch (e) {
+      if (e && e.name === 'AbortError') throw e;
+      throw new Error('网络请求失败（可能是 CORS 或网络问题）：' + e.message);
+    }
+
+    if (!res.ok) {
+      let errText = 'HTTP ' + res.status;
+      let rawBody = '';
+      try {
+        rawBody = await res.text();
+        console.log('[AI Chat] 错误响应原文:', rawBody);
+        try {
+          const errBody = JSON.parse(rawBody);
+          if (errBody.error && errBody.error.message) errText = errBody.error.message;
+        } catch (_) {
+          if (rawBody.length > 0 && rawBody.length < 200) errText += ' - ' + rawBody;
+        }
+      } catch (e) {
+        if (e && e.name === 'AbortError') throw e;
+      }
+      if (res.status === 404) {
+        errText += '\n请求地址：' + cfg.endpoint;
+        errText += '\n请检查端点路径是否正确（应为 .../v1/chat/completions）';
+      }
+      throw new Error(errText);
+    }
+
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      if (e && e.name === 'AbortError') throw e;
+      throw new Error('响应解析失败：' + e.message);
+    }
+    const reply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    if (!reply) throw new Error('响应格式异常：' + JSON.stringify(data).slice(0, 200));
+    return reply.trim();
+  }
+
+  function isOverloadError(err) {
+    const msg = (err && err.message ? err.message : '').toLowerCase();
+    const keywords = [
+      '访问量过大', '稍后再试', '稍后重试', '当前繁忙', '繁忙', '排队',
+      'overloaded', 'currently overloaded', 'server overloaded',
+      'rate limit', 'rate_limit', 'ratelimit',
+      'too many requests', '429',
+      'service unavailable', '503'
+    ];
+    return keywords.some(k => msg.includes(k.toLowerCase()));
+  }
+
+  function sleep(ms, signal) {
+    return new Promise((resolve, reject) => {
+      if (signal.aborted) return reject(new DOMException('Aborted', 'AbortError'));
+      const t = setTimeout(() => {
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      }, ms);
+      function onAbort() {
+        clearTimeout(t);
+        reject(new DOMException('Aborted', 'AbortError'));
+      }
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
+  function setRetryStatus(text) {
+    if (!retryStatusEl) {
+      retryStatusEl = document.createElement('div');
+      retryStatusEl.className = 'msg system retry-status';
+      messagesEl.appendChild(retryStatusEl);
+    }
+    retryStatusEl.textContent = text;
+    scrollToBottom();
+  }
+
+  function clearRetryStatus() {
+    if (retryStatusEl) { retryStatusEl.remove(); retryStatusEl = null; }
+  }
+
+  function setSendBtnMode(mode) {
+    if (mode === 'stop') {
+      sendBtn.classList.add('stop-mode');
+      sendBtn.innerHTML = STOP_ICON;
+      sendBtn.disabled = false;
+      sendBtn.title = '中断生成';
+    } else {
+      sendBtn.classList.remove('stop-mode');
+      sendBtn.innerHTML = SEND_ICON;
+      sendBtn.title = '';
+      sendBtn.disabled = msgInput.value.trim().length === 0 || isLoading;
+    }
+  }
+
+  // 过载切换模型弹窗：返回 {action:'switch'|'continue'|'abort', model?}
+  function showSwitchModelModal(currentModel, otherModels, signal) {
+    return new Promise(resolve => {
+      let settled = false;
+      function done(v) {
+        if (settled) return;
+        settled = true;
+        switchModal.style.display = 'none';
+        signal.removeEventListener('abort', onAbort);
+        resolve(v);
+      }
+      function onAbort() { done({ action: 'abort' }); }
+      if (signal.aborted) { resolve({ action: 'abort' }); return; }
+      signal.addEventListener('abort', onAbort, { once: true });
+
+      switchCurrent.textContent = currentModel;
+      switchOptions.innerHTML = '';
+      otherModels.forEach(m => {
+        const btn = document.createElement('button');
+        btn.className = 'switch-option';
+        btn.textContent = '切换到 ' + m;
+        btn.onclick = () => done({ action: 'switch', model: m });
+        switchOptions.appendChild(btn);
+      });
+      switchContinue.onclick = () => done({ action: 'continue' });
+      switchAbort.onclick = () => done({ action: 'abort' });
+      switchModal.style.display = 'flex';
+    });
+  }
+
+  async function callAI(conv, contextMessages) {
+    const controller = new AbortController();
+    currentAbortController = controller;
+    const cfg = conv.config;
+    const maxRetry = cfg.retryCount;
+    let activeModel = cfg.activeModel;
+    let attempt = 0;
+    let switchPrompted = false;
+
+    while (true) {
+      try {
+        const reply = await fetchOnce(conv, activeModel, controller.signal, contextMessages);
+        return reply;
+      } catch (err) {
+        if (err && err.name === 'AbortError') throw err;
+        if (!isOverloadError(err)) throw err;
+        if (maxRetry === 0) throw err;
+
+        // 过载且多模型：弹窗让用户选（本次请求只弹一次）
+        if (!switchPrompted && cfg.models.length > 1) {
+          const others = cfg.models.filter(m => m !== activeModel);
+          if (others.length > 0) {
+            switchPrompted = true;
+            const choice = await showSwitchModelModal(activeModel, others, controller.signal);
+            if (choice.action === 'abort') {
+              throw new DOMException('Aborted', 'AbortError');
+            } else if (choice.action === 'switch') {
+              activeModel = choice.model;
+              cfg.activeModel = activeModel;
+              renderModelSelect();
+              saveConversations();
+              attempt = 0;
+              setRetryStatus('已切换到 ' + activeModel + '，重试中...');
+              continue;
+            }
+            // continue：继续用当前模型重试
+          }
+        }
+
+        if (attempt >= maxRetry) {
+          throw new Error('已自动重试 ' + maxRetry + ' 次仍失败：' + err.message);
+        }
+        attempt++;
+        const waitMs = Math.min(cfg.retryInterval * 1000 * attempt, MAX_BACKOFF_MS);
+        setRetryStatus('模型访问量过大，正在重试 ' + attempt + '/' + maxRetry + '，等待 ' + Math.round(waitMs / 1000) + 's...');
+        try {
+          await sleep(waitMs, controller.signal);
+        } catch (e) {
+          throw new DOMException('Aborted', 'AbortError');
+        }
+      }
+    }
+  }
+
+  /* ========== 渲染辅助 ========== */
+  function appendMsg(role, text, animate) {
+    const div = document.createElement('div');
+    div.className = 'msg ' + role;
+    div.textContent = text;
+    if (animate === false) div.style.animation = 'none';
+    messagesEl.appendChild(div);
+    scrollToBottom();
+    return div;
+  }
+
+  function showTyping() {
+    const div = document.createElement('div');
+    div.className = 'typing';
+    div.innerHTML = '<span></span><span></span><span></span>';
+    messagesEl.appendChild(div);
+    scrollToBottom();
+    return div;
+  }
+
+  function scrollToBottom() {
+    requestAnimationFrame(() => {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    });
+  }
+
+  /* ========== 视频解析模态框 ========== */
+  function updateVideoConfirm() {
+    videoConfirmBtn.disabled = !videoUrlInput.value.trim() || !videoPromptInput.value.trim() || isLoading;
+  }
+
+  function openVideoModal() {
+    if (isLoading) return;
+    videoModal.style.display = 'flex';
+    updateVideoConfirm();
+    setTimeout(() => videoUrlInput.focus(), 50);
+  }
+
+  function closeVideoModal() {
+    videoModal.style.display = 'none';
+    videoUrlInput.value = '';
+    videoPromptInput.value = '';
+    videoConfirmBtn.disabled = true;
+  }
+
+  videoBtn.addEventListener('click', openVideoModal);
+  videoModalClose.addEventListener('click', closeVideoModal);
+  videoCancelBtn.addEventListener('click', closeVideoModal);
+  videoModal.addEventListener('click', e => { if (e.target === videoModal) closeVideoModal(); });
+  videoUrlInput.addEventListener('input', updateVideoConfirm);
+  videoPromptInput.addEventListener('input', updateVideoConfirm);
+
+  videoConfirmBtn.addEventListener('click', () => {
+    const url = videoUrlInput.value.trim();
+    const prompt = videoPromptInput.value.trim();
+    if (!url || !prompt || isLoading) return;
+    const message =
+      '【视频解析请求】\n' +
+      '视频链接：' + url + '\n' +
+      '提示词：' + prompt + '\n\n' +
+      '请基于以上视频链接解析视频内容，并根据提示词回答相关问题。';
+    closeVideoModal();
+    sendMessage(message);
+  });
+
+  [videoUrlInput, videoPromptInput].forEach(input => {
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        if (!videoConfirmBtn.disabled) videoConfirmBtn.click();
+      } else if (e.key === 'Escape') {
+        closeVideoModal();
+      }
+    });
+  });
+
+  /* ========== 按钮事件 ========== */
+  newChatBtn.addEventListener('click', () => { if (!isLoading) newConversation(); });
+  collapseBtn.addEventListener('click', () => app.classList.toggle('collapsed'));
+  menuBtn.addEventListener('click', () => {
+    // 桌面端收起状态：点此展开侧栏
+    if (app.classList.contains('collapsed')) {
+      app.classList.remove('collapsed');
+      return;
+    }
+    // 窄屏：切换抽屉
+    sidebar.classList.toggle('open');
+  });
+  resetBtn.addEventListener('click', () => { if (!isLoading) openSettings(); });
+  settingsEntryBtn.addEventListener('click', () => { if (!isLoading) openSettings(); });
+
+  modelSelect.addEventListener('change', () => {
+    const conv = getConv();
+    if (!conv) return;
+    conv.config.activeModel = modelSelect.value;
+    saveConversations();
+  });
+
+  addModelBtn.addEventListener('click', () => addModelRow(''));
+  startBtn.addEventListener('click', saveSettings);
+
+  clearChatBtn.addEventListener('click', () => {
+    const conv = getConv();
+    if (!conv) return;
+    if (!confirm('清空当前对话的所有消息？')) return;
+    conv.messages = [];
+    saveConversations();
+    renderMessages();
+    closeSettings();
+    setTimeout(() => msgInput.focus(), 100);
+  });
+
+  deleteChatBtn.addEventListener('click', () => {
+    const conv = getConv();
+    if (!conv) return;
+    if (!confirm('删除当前对话「' + conv.name + '」？此操作不可撤销。')) return;
+    deleteConversation(conv.id);
+    closeSettings();
+  });
+
+  // Esc 关闭设置/视频窗口
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (!configPage.classList.contains('hidden')) { closeSettings(); }
+    else if (videoModal.style.display === 'flex') { closeVideoModal(); }
+  });
+
+  // 设置窗口输入框 Enter 保存
+  [convNameInput, apiEndpointInput, apiKeyInput, maxTokensInput, contextLimitInput, retryCountInput, retryIntervalInput].forEach(input => {
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') startBtn.click(); });
+  });
+
+  function closeSidebarOnMobile() {
+    sidebar.classList.remove('open');
+  }
+
+  /* ========== 启动 ========== */
+  loadConversations();
+  renderConversationList();
+  renderChat();
+  // 首次或当前对话未配置时，自动打开设置
+  const initConv = getConv();
+  if (initConv && (!initConv.config.endpoint || !initConv.config.apiKey)) {
+    openSettings();
+  }
+</script>
+
+</body>
+</html>

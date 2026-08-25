@@ -362,6 +362,25 @@
     max-width: 100%;
   }
 
+  .attachment-file {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #f3f5f8;
+    color: #5d6770;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    max-width: 240px;
+    border: 1px solid #e7ebef;
+  }
+  .attachment-file .file-icon { font-size: 18px; }
+  .attachment-file .file-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   /* 输入栏上方的待发送附件预览条 */
   .attach-preview-bar {
     display: flex;
@@ -632,9 +651,82 @@
 
   .model-rows { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
 
-  .model-row { display: flex; gap: 8px; }
+  .model-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+    padding: 10px;
+    border: 1px solid #e7ebef;
+    border-radius: 10px;
+    background: #fafbfc;
+  }
 
-  .model-row input { flex: 1; }
+  .model-row-left {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .model-name-input {
+    width: 100%;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid #e0e3e6;
+    border-radius: 8px;
+    font-size: 13px;
+    background: #fff;
+    outline: none;
+    font-family: inherit;
+    transition: border-color 0.2s;
+  }
+  .model-name-input:focus { border-color: #2AABEE; }
+
+  .model-caps {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .cap-toggle {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+  }
+  .cap-toggle input {
+    position: absolute;
+    opacity: 0;
+    inset: 0;
+    cursor: pointer;
+    margin: 0;
+  }
+  .cap-toggle span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 28px;
+    border: 1px solid #d0d4d8;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 14px;
+    transition: all 0.15s;
+    cursor: pointer;
+  }
+  .cap-toggle:hover span { border-color: #2AABEE; }
+  .cap-toggle input:checked + span {
+    background: #eaf5fc;
+    border-color: #2AABEE;
+    color: #229ED9;
+    box-shadow: 0 1px 3px rgba(42, 171, 238, 0.2);
+  }
+  .cap-toggle input:focus-visible + span {
+    outline: 2px solid #2AABEE;
+    outline-offset: 1px;
+  }
 
   .model-row .row-del {
     width: 46px;
@@ -938,6 +1030,11 @@
       <button class="attach-btn" id="videoBtn" title="视频解析">
         <svg viewBox="0 0 24 24"><path d="M17 10.5V7a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1v-3.5l4 4v-11l-4 4z"/></svg>
       </button>
+
+      <button class="attach-btn" id="fileBtn" title="上传文件（PDF/TXT/代码等）">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zm5 12H6V4h5v7h7v10zM8 18h8v-2H8v2zm0-4h8v-2H8v2z"/></svg>
+      </button>
+      <input type="file" id="fileFile" style="display:none" multiple>
       <textarea id="msgInput" placeholder="输入消息..." rows="1"></textarea>
       <button class="send-btn" id="sendBtn" disabled>
         <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
@@ -1009,36 +1106,28 @@
       </div>
 
       <div class="mm-group">
-        <div class="mm-title">📷 多模态能力</div>
-        <div class="mm-row">
-          <label class="mm-label">
-            <input type="checkbox" id="mmVisionSupport"> 模型支持图片分析（直接发送图片）
-          </label>
-        </div>
-        <div class="mm-row">
-          <input type="text" class="tool-endpoint" id="mmOcrEndpoint" placeholder="OCR 工具端点（未勾选时使用，POST 返回 {text}）">
-        </div>
-        <div class="mm-hint">不勾选时，图片走 OCR 工具（如 http://localhost:8000/ocr，请求体 form-data: image=文件），把识别文本喂给 AI</div>
+        <div class="mm-title">� 多模态工具端点（所有模型共享）</div>
+        <div class="mm-hint">请在上方「模型列表」中为每个模型单独勾选其多模态能力（🖼图片 / 🎤音频 / 🎬视频 / 📄文档）。工具端点是外部服务，与模型无关，所有模型共用。</div>
 
         <div class="mm-row">
-          <label class="mm-label">
-            <input type="checkbox" id="mmAudioSupport"> 模型支持音频解析（直接发送音频）
-          </label>
+          <input type="text" class="tool-endpoint" id="mmOcrEndpoint" placeholder="OCR 工具端点（POST 返回 {text}）">
         </div>
-        <div class="mm-row">
-          <input type="text" class="tool-endpoint" id="mmAsrEndpoint" placeholder="ASR 工具端点（未勾选时使用，POST 返回 {text}）">
-        </div>
-        <div class="mm-hint">不勾选时，语音走 ASR 工具转文本。支持上传或浏览器直接录音</div>
+        <div class="mm-hint">图片未勾选「模型支持图片分析」时使用，POST form-data: image=文件</div>
 
         <div class="mm-row">
-          <label class="mm-label">
-            <input type="checkbox" id="mmVideoSupport"> 模型支持视频解析（直接发送视频链接/文件）
-          </label>
+          <input type="text" class="tool-endpoint" id="mmAsrEndpoint" placeholder="ASR 工具端点（POST 返回 {text}）">
         </div>
+        <div class="mm-hint">语音未勾选「模型支持音频解析」时使用</div>
+
         <div class="mm-row">
-          <input type="text" class="tool-endpoint" id="mmVideoToolEndpoint" placeholder="视频分析工具端点（未勾选时使用）">
+          <input type="text" class="tool-endpoint" id="mmVideoToolEndpoint" placeholder="视频分析工具端点（POST form-data，返回 {frames:[{text}], summary}）">
         </div>
-        <div class="mm-hint">不勾选时，走抽帧/OCR 工具（POST form-data 含 video/url+prompt，返回 {frames:[{image,text}], summary}）</div>
+        <div class="mm-hint">视频未勾选「模型支持视频解析」时使用</div>
+
+        <div class="mm-row">
+          <input type="text" class="tool-endpoint" id="mmFileToolEndpoint" placeholder="文本提取工具端点（POST form-data: file=文件，返回 {text}）">
+        </div>
+        <div class="mm-hint">文档未勾选「模型支持文档解析」时使用，支持 PDF/Word/TXT/代码等</div>
       </div>
 
       <button class="start-btn" id="startBtn">保存并返回</button>
@@ -1112,6 +1201,8 @@
   const imageFile = document.getElementById('imageFile');
   const audioBtn = document.getElementById('audioBtn');
   const audioFile = document.getElementById('audioFile');
+  const fileBtn = document.getElementById('fileBtn');
+  const fileFile = document.getElementById('fileFile');
 
   const configPage = document.getElementById('configPage');
   const convNameInput = document.getElementById('convName');
@@ -1124,12 +1215,10 @@
   const contextLimitInput = document.getElementById('contextLimit');
   const retryCountInput = document.getElementById('retryCount');
   const retryIntervalInput = document.getElementById('retryInterval');
-  const mmVisionSupportEl = document.getElementById('mmVisionSupport');
   const mmOcrEndpointEl = document.getElementById('mmOcrEndpoint');
-  const mmAudioSupportEl = document.getElementById('mmAudioSupport');
   const mmAsrEndpointEl = document.getElementById('mmAsrEndpoint');
-  const mmVideoSupportEl = document.getElementById('mmVideoSupport');
   const mmVideoToolEndpointEl = document.getElementById('mmVideoToolEndpoint');
+  const mmFileToolEndpointEl = document.getElementById('mmFileToolEndpoint');
   const startBtn = document.getElementById('startBtn');
   const clearChatBtn = document.getElementById('clearChatBtn');
   const deleteChatBtn = document.getElementById('deleteChatBtn');
@@ -1180,37 +1269,69 @@
     const base = {
       endpoint: '',
       apiKey: '',
-      models: ['gpt-3.5-turbo'],
+      // 每个模型独立配置多模态能力
+      models: [{ name: 'gpt-3.5-turbo', visionSupport: false, audioSupport: false, videoSupport: false, fileSupport: false }],
       activeModel: 'gpt-3.5-turbo',
       maxTokens: 0,
       contextLimit: 0,
       retryCount: 10,
       retryInterval: 2,
-      // 多模态能力
-      visionSupport: false,
+      // 工具端点（对话级，所有模型共享）
       ocrEndpoint: '',
-      audioSupport: false,
       asrEndpoint: '',
-      videoSupport: false,
-      videoToolEndpoint: ''
+      videoToolEndpoint: '',
+      fileToolEndpoint: ''
     };
     if (prev) {
       base.endpoint = prev.endpoint || '';
       base.apiKey = prev.apiKey || '';
-      base.models = (prev.models && prev.models.length) ? prev.models.slice() : ['gpt-3.5-turbo'];
-      base.activeModel = prev.activeModel || base.models[0];
+      // 旧数据兼容：数组元素可能是字符串，也可能是对象
+      if (prev.models && prev.models.length) {
+        base.models = prev.models.map(m => {
+          if (typeof m === 'string') {
+            return {
+              name: m,
+              visionSupport: !!prev.visionSupport,
+              audioSupport: !!prev.audioSupport,
+              videoSupport: !!prev.videoSupport,
+              fileSupport: !!prev.fileSupport
+            };
+          }
+          return {
+            name: m.name || String(m),
+            visionSupport: !!m.visionSupport,
+            audioSupport: !!m.audioSupport,
+            videoSupport: !!m.videoSupport,
+            fileSupport: !!m.fileSupport
+          };
+        });
+      }
+      base.activeModel = prev.activeModel || base.models[0].name;
       base.maxTokens = prev.maxTokens ?? 0;
       base.contextLimit = prev.contextLimit ?? 0;
       base.retryCount = prev.retryCount ?? 10;
       base.retryInterval = prev.retryInterval ?? 2;
-      base.visionSupport = !!prev.visionSupport;
       base.ocrEndpoint = prev.ocrEndpoint || '';
-      base.audioSupport = !!prev.audioSupport;
       base.asrEndpoint = prev.asrEndpoint || '';
-      base.videoSupport = !!prev.videoSupport;
       base.videoToolEndpoint = prev.videoToolEndpoint || '';
+      base.fileToolEndpoint = prev.fileToolEndpoint || '';
     }
     return base;
+  }
+
+  // 获取当前激活模型的多模态能力
+  function getActiveModelCaps(cfg) {
+    if (!cfg || !cfg.models || !cfg.models.length) {
+      return { visionSupport: false, audioSupport: false, videoSupport: false, fileSupport: false };
+    }
+    const name = cfg.activeModel || cfg.models[0].name;
+    const m = cfg.models.find(x => x.name === name) || cfg.models[0];
+    return {
+      visionSupport: !!m.visionSupport,
+      audioSupport: !!m.audioSupport,
+      videoSupport: !!m.videoSupport,
+      fileSupport: !!m.fileSupport
+    };
   }
 
   function getConv() {
@@ -1242,12 +1363,35 @@
     conversations.forEach(c => {
       if (!c.config) c.config = defaultConfig();
       c.config = Object.assign(defaultConfig(), c.config);
-      if (!Array.isArray(c.config.models) || !c.config.models.length) c.config.models = ['gpt-3.5-turbo'];
-      if (!c.config.activeModel || !c.config.models.includes(c.config.activeModel)) {
-        c.config.activeModel = c.config.models[0];
+      // 迁移旧数据：models 可能是字符串数组
+      if (c.config.models.length && typeof c.config.models[0] === 'string') {
+        const oldGlobal = {
+          visionSupport: !!c.config.visionSupport,
+          audioSupport: !!c.config.audioSupport,
+          videoSupport: !!c.config.videoSupport,
+          fileSupport: !!c.config.fileSupport
+        };
+        c.config.models = c.config.models.map(n => ({
+          name: n,
+          visionSupport: oldGlobal.visionSupport,
+          audioSupport: oldGlobal.audioSupport,
+          videoSupport: oldGlobal.videoSupport,
+          fileSupport: oldGlobal.fileSupport
+        }));
+      }
+      // 确保每个模型对象都有完整字段
+      c.config.models = c.config.models.map(m => ({
+        name: m.name || String(m),
+        visionSupport: !!m.visionSupport,
+        audioSupport: !!m.audioSupport,
+        videoSupport: !!m.videoSupport,
+        fileSupport: !!m.fileSupport
+      }));
+      if (!c.config.models.length) c.config.models = [{ name: 'gpt-3.5-turbo', visionSupport: false, audioSupport: false, videoSupport: false, fileSupport: false }];
+      if (!c.config.activeModel || !c.config.models.some(m => m.name === c.config.activeModel)) {
+        c.config.activeModel = c.config.models[0].name;
       }
       if (!Array.isArray(c.messages)) c.messages = [];
-      // 数据兼容：确保纯文本消息 content 为字符串；保留 attachments
       c.messages.forEach(m => { if (typeof m.content !== 'string') m.content = String(m.content || ''); });
     });
     if (conversations.length === 0) {
@@ -1357,9 +1501,9 @@
     if (!conv) return;
     conv.config.models.forEach(m => {
       const opt = document.createElement('option');
-      opt.value = m;
-      opt.textContent = m;
-      if (m === conv.config.activeModel) opt.selected = true;
+      opt.value = m.name;
+      opt.textContent = m.name;
+      if (m.name === conv.config.activeModel) opt.selected = true;
       modelSelect.appendChild(opt);
     });
   }
@@ -1395,34 +1539,76 @@
   }
 
   /* ========== 设置窗口 ========== */
-  function addModelRow(value) {
+  function addModelRow(modelData) {
+    const isObj = typeof modelData === 'object' && modelData !== null;
+    const m = isObj ? modelData : { name: modelData || '', visionSupport: false, audioSupport: false, videoSupport: false, fileSupport: false };
     const row = document.createElement('div');
     row.className = 'model-row';
+
+    const left = document.createElement('div');
+    left.className = 'model-row-left';
+
     const input = document.createElement('input');
     input.type = 'text';
     input.placeholder = '模型名称，如 gpt-3.5-turbo';
-    input.value = value || '';
+    input.value = m.name || '';
     input.autocomplete = 'off';
+    input.className = 'model-name-input';
+
+    // 4 个紧凑图标复选框
+    const caps = document.createElement('div');
+    caps.className = 'model-caps';
+    const capDefs = [
+      { key: 'visionSupport', title: '支持图片分析', icon: '🖼' },
+      { key: 'audioSupport', title: '支持音频解析', icon: '🎤' },
+      { key: 'videoSupport', title: '支持视频解析', icon: '🎬' },
+      { key: 'fileSupport', title: '支持文档解析', icon: '📄' }
+    ];
+    capDefs.forEach(def => {
+      const lbl = document.createElement('label');
+      lbl.className = 'cap-toggle';
+      lbl.title = def.title;
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !!m[def.key];
+      cb.dataset.cap = def.key;
+      const span = document.createElement('span');
+      span.textContent = def.icon;
+      lbl.appendChild(cb);
+      lbl.appendChild(span);
+      caps.appendChild(lbl);
+    });
+
+    left.appendChild(input);
+    left.appendChild(caps);
+
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'row-del';
     del.textContent = '×';
     del.title = '删除该模型';
-    del.onclick = () => {
-      row.remove();
-      syncDefaultModelOptions();
-    };
+    del.onclick = () => { row.remove(); syncDefaultModelOptions(); };
     input.addEventListener('input', syncDefaultModelOptions);
-    row.appendChild(input);
+
+    row.appendChild(left);
     row.appendChild(del);
     modelRowsEl.appendChild(row);
     syncDefaultModelOptions();
   }
 
   function collectModels() {
-    return Array.from(modelRowsEl.querySelectorAll('.model-row input'))
-      .map(i => i.value.trim())
-      .filter(m => m.length > 0);
+    return Array.from(modelRowsEl.querySelectorAll('.model-row'))
+      .map(row => {
+        const input = row.querySelector('.model-name-input');
+        const name = (input ? input.value.trim() : '');
+        if (!name) return null;
+        const caps = { visionSupport: false, audioSupport: false, videoSupport: false, fileSupport: false };
+        row.querySelectorAll('.cap-toggle input').forEach(cb => {
+          caps[cb.dataset.cap] = cb.checked;
+        });
+        return { name, ...caps };
+      })
+      .filter(m => m !== null);
   }
 
   function syncDefaultModelOptions() {
@@ -1438,14 +1624,12 @@
     }
     models.forEach(m => {
       const opt = document.createElement('option');
-      opt.value = m;
-      opt.textContent = m;
-      if (m === prev) opt.selected = true;
+      opt.value = m.name;
+      opt.textContent = m.name;
+      if (m.name === prev) opt.selected = true;
       defaultModelSelect.appendChild(opt);
     });
-    if (!models.includes(defaultModelSelect.value) && defaultModelSelect.options.length > 0) {
-      defaultModelSelect.selectedIndex = 0;
-    }
+    if (!defaultModelSelect.value) defaultModelSelect.value = models[0].name;
   }
 
   function openSettings() {
@@ -1456,19 +1640,19 @@
     apiEndpointInput.value = conv.config.endpoint || '';
     apiKeyInput.value = conv.config.apiKey || '';
     modelRowsEl.innerHTML = '';
-    (conv.config.models.length ? conv.config.models : ['gpt-3.5-turbo']).forEach(m => addModelRow(m));
+    (conv.config.models.length ? conv.config.models : [{ name: 'gpt-3.5-turbo', visionSupport: false, audioSupport: false, videoSupport: false, fileSupport: false }])
+      .forEach(m => addModelRow(m));
     syncDefaultModelOptions();
-    defaultModelSelect.value = conv.config.activeModel || collectModels()[0] || '';
+    defaultModelSelect.value = conv.config.activeModel || (collectModels()[0] && collectModels()[0].name) || '';
     maxTokensInput.value = conv.config.maxTokens ?? 0;
     contextLimitInput.value = conv.config.contextLimit ?? 0;
     retryCountInput.value = conv.config.retryCount ?? 10;
     retryIntervalInput.value = conv.config.retryInterval ?? 2;
-    mmVisionSupportEl.checked = !!conv.config.visionSupport;
+    // 工具端点（对话级共享）
     mmOcrEndpointEl.value = conv.config.ocrEndpoint || '';
-    mmAudioSupportEl.checked = !!conv.config.audioSupport;
     mmAsrEndpointEl.value = conv.config.asrEndpoint || '';
-    mmVideoSupportEl.checked = !!conv.config.videoSupport;
     mmVideoToolEndpointEl.value = conv.config.videoToolEndpoint || '';
+    mmFileToolEndpointEl.value = conv.config.fileToolEndpoint || '';
     configError.textContent = '';
     configPage.classList.remove('hidden');
     setTimeout(() => convNameInput.focus(), 100);
@@ -1494,7 +1678,7 @@
     if (!endpoint) { configError.textContent = '请填写 API 端点'; return; }
     if (!apiKey) { configError.textContent = '请填写 API Key'; return; }
     if (models.length === 0) { configError.textContent = '请至少添加一个模型'; return; }
-    if (!activeModel || !models.includes(activeModel)) activeModel = models[0];
+    if (!activeModel || !models.some(m => m.name === activeModel)) activeModel = models[0].name;
 
     // 智能补全端点
     let finalEndpoint = endpoint;
@@ -1527,12 +1711,10 @@
     conv.config.contextLimit = contextLimit;
     conv.config.retryCount = retryCount;
     conv.config.retryInterval = retryInterval;
-    conv.config.visionSupport = !!mmVisionSupportEl.checked;
     conv.config.ocrEndpoint = mmOcrEndpointEl.value.trim();
-    conv.config.audioSupport = !!mmAudioSupportEl.checked;
     conv.config.asrEndpoint = mmAsrEndpointEl.value.trim();
-    conv.config.videoSupport = !!mmVideoSupportEl.checked;
     conv.config.videoToolEndpoint = mmVideoToolEndpointEl.value.trim();
+    conv.config.fileToolEndpoint = mmFileToolEndpointEl.value.trim();
 
     saveConversations();
     renderConversationList();
@@ -1738,6 +1920,7 @@
   /* ========== 多模态工具与附件 ========== */
   // 统一把一条消息对象转为 API 需要的 content（string 或 content parts 数组）
   function normalizeMessageContent(m, cfg) {
+    const caps = getActiveModelCaps(cfg);
     if (!m.attachments || !m.attachments.length) {
       if (typeof m.content !== 'string') return String(m.content || '');
       return m.content;
@@ -1745,7 +1928,7 @@
     const parts = [];
     m.attachments.forEach(a => {
       if (a.type === 'image' && a.dataUrl) {
-        if (cfg.visionSupport) {
+        if (caps.visionSupport) {
           parts.push({ type: 'image_url', image_url: { url: a.dataUrl } });
         } else if (a._ocrText !== undefined) {
           parts.push({ type: 'text', text: `【图片OCR：${a.name || '图片'}】\n${a._ocrText}` });
@@ -1753,7 +1936,7 @@
           parts.push({ type: 'text', text: `【图片：${a.name || '未命名图片'}（OCR未执行）】` });
         }
       } else if (a.type === 'audio' && a.dataUrl) {
-        if (cfg.audioSupport) {
+        if (caps.audioSupport) {
           parts.push({ type: 'input_audio', input_audio: { data: a.dataUrl.split(',')[1] || a.dataUrl, format: (a.ext || 'webm') } });
         } else if (a._asrText !== undefined) {
           parts.push({ type: 'text', text: `【语音转写：${a.name || '语音'}】\n${a._asrText}` });
@@ -1761,9 +1944,9 @@
           parts.push({ type: 'text', text: `【语音：${a.name || '未命名语音'}（ASR未执行）】` });
         }
       } else if (a.type === 'video') {
-        if (cfg.videoSupport && a.dataUrl) {
+        if (caps.videoSupport && a.dataUrl) {
           parts.push({ type: 'input_video', input_video: { data: a.dataUrl.split(',')[1] || a.dataUrl, format: (a.ext || 'mp4') } });
-        } else if (cfg.videoSupport && a.url) {
+        } else if (caps.videoSupport && a.url) {
           parts.push({ type: 'text', text: `【视频链接：${a.url}】` });
         } else if (a._toolSummary !== undefined) {
           parts.push({ type: 'text', text: `【视频分析结果：${a.url || a.name || '视频'}】\n${a._toolSummary}\n${a.prompt ? '\n用户提问：' + a.prompt : ''}` });
@@ -1774,6 +1957,14 @@
         }
       } else if (a.type === 'link' && a.url) {
         parts.push({ type: 'text', text: `【链接：${a.label || a.url}】${a.url}` });
+      } else if (a.type === 'file') {
+        if (caps.fileSupport && a.dataUrl) {
+          parts.push({ type: 'file', file: { file_data: a.dataUrl, filename: a.name || 'file' } });
+        } else if (a._extractText !== undefined) {
+          parts.push({ type: 'text', text: `【文件内容：${a.name || '文件'}】\n${a._extractText}` });
+        } else {
+          parts.push({ type: 'text', text: `【文件：${a.name || '未命名文件'}（文本提取未执行）】` });
+        }
       }
     });
     const text = m.content;
@@ -1784,23 +1975,25 @@
     const hasVision = m.attachments.some(a => a.type === 'image');
     const hasAudio = m.attachments.some(a => a.type === 'audio');
     const hasVideo = m.attachments.some(a => a.type === 'video');
-    if ((hasVision && !cfg.visionSupport) || (hasAudio && !cfg.audioSupport) || (hasVideo && !cfg.videoSupport)) {
+    const hasFile = m.attachments.some(a => a.type === 'file');
+    if ((hasVision && !caps.visionSupport) || (hasAudio && !caps.audioSupport) || (hasVideo && !caps.videoSupport) || (hasFile && !caps.fileSupport)) {
       return parts.map(p => (p && p.text) || '').join('\n\n').trim() || ' ';
     }
-    // 如果所有附件都用了 direct support，且含 image/audio/video，保持 parts
-    if (parts.some(p => p.type === 'image_url' || p.type === 'input_audio' || p.type === 'input_video')) {
+    // 如果所有附件都用了 direct support，且含 image/audio/video/file，保持 parts
+    if (parts.some(p => p.type === 'image_url' || p.type === 'input_audio' || p.type === 'input_video' || p.type === 'file')) {
       return parts;
     }
     // 否则返回纯文本拼接（避免空 parts）
     return parts.map(p => (p && p.text) || '').join('\n\n').trim() || text || ' ';
   }
 
-  // 发送前处理附件：按开关决定是否调用工具
+  // 发送前处理附件：按当前激活模型的能力开关决定是否调用工具
   async function processAttachments(attachments, cfg, signal) {
     if (!attachments || !attachments.length) return;
+    const caps = getActiveModelCaps(cfg);
     for (const a of attachments) {
       if (a.type === 'image') {
-        if (cfg.visionSupport) continue;
+        if (caps.visionSupport) continue;
         // OCR 兜底
         if (!cfg.ocrEndpoint) {
           a._ocrText = '(未配置 OCR 工具端点，请在设置中填写)';
@@ -1818,7 +2011,7 @@
           a._ocrText = `(OCR 调用失败：${e.message})`;
         }
       } else if (a.type === 'audio') {
-        if (cfg.audioSupport) continue;
+        if (caps.audioSupport) continue;
         if (!cfg.asrEndpoint) {
           a._asrText = '(未配置 ASR 工具端点，请在设置中填写)';
           continue;
@@ -1836,7 +2029,7 @@
           a._asrText = `(ASR 调用失败：${e.message})`;
         }
       } else if (a.type === 'video') {
-        if (cfg.videoSupport) continue;
+        if (caps.videoSupport) continue;
         if (!cfg.videoToolEndpoint) {
           a._toolSummary = a.url ? `(未配置视频分析工具，请直接让模型分析：${a.url})` : '(未配置视频分析工具端点)';
           continue;
@@ -1857,6 +2050,23 @@
         } catch (e) {
           if (e && e.name === 'AbortError') throw e;
           a._toolSummary = `(视频工具调用失败：${e.message})`;
+        }
+      } else if (a.type === 'file') {
+        if (caps.fileSupport) continue;
+        if (!cfg.fileToolEndpoint) {
+          a._extractText = '(未配置文本提取工具端点，请在设置中填写)';
+          continue;
+        }
+        try {
+          const blob = await dataUrlToBlob(a.dataUrl, a.mime);
+          const fd = new FormData();
+          fd.append('file', blob, a.name || 'file');
+          const r = await fetch(cfg.fileToolEndpoint, { method: 'POST', body: fd, signal });
+          const json = await r.json();
+          a._extractText = (json && (json.text || json.result || json.content)) || '';
+        } catch (e) {
+          if (e && e.name === 'AbortError') throw e;
+          a._extractText = `(文本提取调用失败：${e.message})`;
         }
       }
     }
@@ -1899,6 +2109,7 @@
       if (a.type === 'image') label = '🖼 ' + (a.name || '图片');
       else if (a.type === 'audio') label = '🎤 ' + (a.name || '语音');
       else if (a.type === 'video') label = '🎬 ' + (a.url || a.name || '视频').slice(0, 28);
+      else if (a.type === 'file') label = '📄 ' + (a.name || '文件');
       else label = a.name || a.type;
       if (a.type === 'image' && a.dataUrl) {
         const img = document.createElement('img');
@@ -1977,9 +2188,21 @@
       if (e && e.name === 'AbortError') throw e;
       throw new Error('响应解析失败：' + e.message);
     }
-    const reply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-    if (!reply) throw new Error('响应格式异常：' + JSON.stringify(data).slice(0, 200));
-    return reply.trim();
+    const choice = data.choices && data.choices[0];
+    const msg = choice && choice.message;
+    if (!msg) throw new Error('响应格式异常：' + JSON.stringify(data).slice(0, 200));
+    // 兼容推理模型（DeepSeek-R1 / Qwen-QwQ 等）：正文可能在 content，也可能在 reasoning_content
+    let content = msg.content || '';
+    const reasoning = msg.reasoning_content || msg.reasoning || '';
+    if (!content && reasoning) content = reasoning;
+    if (!content) {
+      throw new Error('响应格式异常：' + JSON.stringify(data).slice(0, 200));
+    }
+    // 若被 max_tokens 截断，给个提示（不影响返回）
+    if (choice.finish_reason === 'length') {
+      console.warn('[AI Chat] 回复被 max_tokens 截断（finish_reason=length）');
+    }
+    return content.trim();
   }
 
   function isOverloadError(err) {
@@ -2087,7 +2310,7 @@
 
         // 过载且多模型：弹窗让用户选（本次请求只弹一次）
         if (!switchPrompted && cfg.models.length > 1) {
-          const others = cfg.models.filter(m => m !== activeModel);
+          const others = cfg.models.filter(m => m.name !== activeModel).map(m => m.name);
           if (others.length > 0) {
             switchPrompted = true;
             const choice = await showSwitchModelModal(activeModel, others, controller.signal);
@@ -2169,6 +2392,13 @@
           l.rel = 'noopener';
           l.textContent = a.label || a.url;
           box.appendChild(l);
+        } else if (a.type === 'file') {
+          const f = document.createElement('div');
+          f.className = 'attachment-file';
+          f.innerHTML = '<span class="file-icon">📄</span><span class="file-name"></span>';
+          f.querySelector('.file-name').textContent = a.name || '未命名文件';
+          f.title = a.name || '未命名文件';
+          box.appendChild(f);
         }
       });
       div.prepend(box);
@@ -2289,6 +2519,23 @@
         pendingAttachments.push({ type: 'image', name: f.name, dataUrl, mime: f.type, ext });
       } catch (err) {
         appendMsg('error failure', '读取图片失败：' + err.message);
+      }
+    }
+    renderPendingAttachments();
+    updateSendBtnState();
+  });
+
+  /* ========== 文件上传按钮 ========== */
+  fileBtn.addEventListener('click', () => fileFile.click());
+  fileFile.addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files || []);
+    fileFile.value = '';
+    for (const f of files) {
+      try {
+        const dataUrl = await fileToDataUrl(f);
+        pendingAttachments.push({ type: 'file', name: f.name, dataUrl, mime: f.type, ext: (f.name.split('.').pop() || '').toLowerCase() });
+      } catch (err) {
+        appendMsg('error failure', '读取文件失败：' + err.message);
       }
     }
     renderPendingAttachments();
